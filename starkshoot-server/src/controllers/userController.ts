@@ -292,6 +292,8 @@ export const fetchAvailableRooms = async (req: Request, res: Response) => {
         playersInRoom: room.users.length,
         Duration: room.Duration, // Original duration
         AvailableDuration: availableDuration,
+        stakingAmount: room.stakingAmount,
+        stakingToken: room.stakingToken,
         meetsMinimumRequirement
       };
     }).filter(room => room.meetsMinimumRequirement)
@@ -306,7 +308,7 @@ export const fetchAvailableRooms = async (req: Request, res: Response) => {
 
 /// 2. Create a new room
 export const createRoom = async (req: Request, res: Response) => {
-  const { roomId, Duration, maxMembers, creator } = req.body;
+  const { roomId, Duration, maxMembers, creator, stakingAmount, stakingToken } = req.body;
 
   try {
     // Check if room already exists
@@ -322,7 +324,9 @@ export const createRoom = async (req: Request, res: Response) => {
       users: [],
       creator,
       gameStarted: false,
-      gameEnded: false
+      gameEnded: false,
+      stakingAmount: stakingAmount || 0,
+      stakingToken: stakingToken || 'STK'
     });
 
     await newRoom.save();
@@ -331,6 +335,8 @@ export const createRoom = async (req: Request, res: Response) => {
       success: true,
       roomId: newRoom.roomId,
       schemaId: newRoom._id,
+      stakingAmount: newRoom.stakingAmount,
+      stakingToken: newRoom.stakingToken,
       message: 'Room created successfully'
     });
   } catch (err) {

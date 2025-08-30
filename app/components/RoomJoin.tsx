@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { AngleClipButton } from "./Button";
 import { BACKEND_URL } from "@/lib/constant";
 import { RiRefreshFill } from "react-icons/ri";
+import toast from "react-hot-toast";
 
 interface ZoneOption {
   name: string;
@@ -12,6 +13,8 @@ interface ZoneOption {
   maxPlayers: number;
   playersInRoom: number;
   gameStarted: boolean;
+  stakingAmount?: number;
+  stakingToken?: string;
 }
 
 interface RoomPopupProps {
@@ -26,7 +29,9 @@ interface RoomPopupProps {
   mode: "solo" | "team";
   setMode: (mode: "solo" | "team") => void;
   setSoldierName: (name: string) => void;
-  onShowStakePopup: () => void; // Added prop for staking popup
+  onShowStakePopup: (roomStakeAmount?: number) => void; // Updated to accept room stake amount
+  stakingAmount?: number; // Staking amount for the room
+  setStakingAmount?: (amount: number) => void; // Prop to update staking amount
 }
 
 const RoomPopup: React.FC<RoomPopupProps> = ({
@@ -39,6 +44,8 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
   mode,
   setSoldierName,
   onShowStakePopup, // Destructure new prop
+  stakingAmount = 10, // Default staking amount
+  setStakingAmount, // Prop to update staking amount
 }) => {
   const [zoneOptions, setZoneOptions] = useState<ZoneOption[]>([]);
   const [remainingTimes, setRemainingTimes] = useState<Record<string, number>>(
@@ -57,11 +64,27 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
     try {
       setError("");
       setLoading(true);
+      
       const response = await fetch(`${BACKEND_URL}/api/rooms/available`);
+      
       if (!response.ok) {
-        throw new Error("Failed to fetch rooms");
+        if (response.status === 404) {
+          // No rooms available, which is fine
+          setZoneOptions([]);
+          setRemainingTimes({});
+          return;
+        } else {
+          throw new Error(`Failed to fetch rooms: ${response.status}`);
+        }
       }
+      
       const data = await response.json();
+
+      if (!Array.isArray(data)) {
+        console.error("Invalid data format received:", data);
+        setZoneOptions([]);
+        return;
+      }
 
       const rooms = data.map((room: any) => ({
         name: room.roomId,
@@ -72,6 +95,8 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
         maxPlayers: room.totalPlayers,
         playersInRoom: room.playersInRoom,
         gameStarted: room.gameStarted,
+        stakingAmount: room.stakingAmount,
+        stakingToken: room.stakingToken,
       }));
 
       setZoneOptions(rooms);
@@ -90,10 +115,13 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
         setZoneCode(rooms[0].id);
         setDuration(rooms[0].duration.toString());
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error occurred");
-      console.error("Error fetching rooms:", err);
-    } finally {
+         } catch (err) {
+       const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
+       setError(errorMessage);
+       console.error("Error fetching rooms:", err);
+       toast.error("Failed to fetch rooms: " + errorMessage);
+       setZoneOptions([]);
+     } finally {
       setLoading(false);
     }
   }, [setZoneCode, setDuration, zoneCode]);
@@ -175,6 +203,8 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
           Duration: customDuration,
           maxMembers: maxPlayers,
           creator: walletAddress,
+          stakingAmount: stakingAmount,
+          stakingToken: 'STK',
         }),
       });
 
@@ -183,9 +213,9 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
       if (!response.ok) {
         throw new Error(data.error || "Failed to create room");
       }
-      if (response.ok) {
-        alert(" Room Created Successfully");
-      }
+             if (response.ok) {
+         toast.success("Room Created Successfully!");
+       }
 
       const newZone: ZoneOption = {
         name: customZoneName,
@@ -195,6 +225,8 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
         players: [soldierName],
         maxPlayers: maxPlayers,
         gameStarted: false,
+        stakingAmount: stakingAmount,
+        stakingToken: 'STK',
       };
 
       setZoneOptions((prev) => [...prev, newZone]);
@@ -204,39 +236,48 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
 
       // Start the game in team mode as creator
       // handleJoinZone();
-    } catch (err) {
-      console.error("Error creating room:", err);
-      setError(err instanceof Error ? err.message : "Failed to create room");
-    }
+         } catch (err) {
+       console.error("Error creating room:", err);
+       const errorMessage = err instanceof Error ? err.message : "Failed to create room";
+       setError(errorMessage);
+       toast.error(errorMessage);
+     }
   };
 
-  const handleJoinZone = async () => {
+    const handleJoinZone = async () => {
     console.log("handleJoinZone called");
     console.log("joinZoneId:", joinZoneId);
     console.log("walletAddress:", walletAddress);
     
     try {
       if (!joinZoneId) {
-        console.log("No zone selected, showing alert");
-        alert("Please select a zone first");
+        console.log("No zone selected, showing toast");
+        toast.error("Please select a zone first");
         return;
       }
       if (!walletAddress) {
         throw new Error("Wallet address is required to join a room");
       }
       
+      // Find the selected room to get its staking amount
+      const selectedRoom = zoneOptions.find(room => room.name === joinZoneId);
+      if (!selectedRoom) {
+        toast.error("Selected room not found");
+        return;
+      }
+      
       // Store the selected room info for later use after staking
       setZoneCode(joinZoneId);
       
-      // Show staking popup instead of directly joining
-      console.log("Showing staking popup");
-      onShowStakePopup();
+      // Show staking popup with the room's staking amount
+      console.log("Showing staking popup for room:", selectedRoom.name, "with stake:", selectedRoom.stakingAmount);
+      onShowStakePopup(selectedRoom.stakingAmount);
       
     } catch (err) {
       console.error("Error in handleJoinZone:", err);
-      setError(
-        err instanceof Error ? err.message : "Failed to process join request"
-      );
+      const errorMessage = err instanceof Error ? err.message : "Failed to process join request";
+      setError(errorMessage);
+      toast.error(errorMessage);
     }
   };
 
@@ -318,6 +359,11 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
                         <span className="text-sm text-gray-400">
                           ({zone.playersInRoom}/{zone.maxPlayers} players)
                         </span>
+                        {zone.stakingAmount && (
+                          <span className="text-xs text-yellow-400">
+                            Stake: {zone.stakingAmount} {zone.stakingToken || 'STK'}
+                          </span>
+                        )}
                       </div>
                       <div className="text-sm text-cyan-400 ml-auto">
                         {formatTime(remainingTimes[zone.id] || 0)}
@@ -398,6 +444,25 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
               value={maxPlayers}
               onChange={(e) => setMaxPlayers(parseInt(e.target.value))}
               className="w-full mt-2 px-3 py-2 text-white text-base border border-gray-300"
+            />
+          </div>
+
+          <div>
+            <label className="block text-lg font-semibold">Staking Amount (STK):</label>
+            <input
+              type="number"
+              min="1"
+              max="1000"
+              step="1"
+              value={stakingAmount}
+              onChange={(e) => {
+                const amount = parseInt(e.target.value) || 0;
+                if (setStakingAmount) {
+                  setStakingAmount(amount);
+                }
+              }}
+              className="w-full mt-2 px-3 py-2 text-white text-base border border-gray-300"
+              placeholder="Enter staking amount"
             />
           </div>
 

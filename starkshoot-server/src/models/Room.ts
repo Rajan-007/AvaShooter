@@ -12,7 +12,9 @@ const roomSchema = new mongoose.Schema({
   startedAt: { type: Date, default: null },
   maxMembers: { type: Number, default: 6 },
   creator: { type: String, default: null },
-  winner: { type: String, ref: 'User', default: null }
+  winner: { type: String, ref: 'User', default: null },
+  stakingAmount: { type: Number, default: 0 }, // Staking amount for the room
+  stakingToken: { type: String, default: 'STK' } // Token used for staking
 });
 
 export const Room = mongoose.model('Room', roomSchema);

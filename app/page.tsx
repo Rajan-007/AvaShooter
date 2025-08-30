@@ -96,6 +96,7 @@ export default function Home() {
   const [showGameFrame, setShowGameFrame] = useState(false);
   const [stakeAmount, setStakeAmount] = useState(10);
   const [stakeLoading, setStakeLoading] = useState(false);
+  const [stakingFromRoomJoin, setStakingFromRoomJoin] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [transactionHash, setTransactionHash] = useState<string | null>(null);
   // const [playerName, setPlayerName] = useState('');
@@ -127,7 +128,6 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [zoneCode, setZoneCode] = useState(null);
   const [duration, setDuration] = useState("1 Min");
-  const [stakingFromRoomJoin, setStakingFromRoomJoin] = useState(false);
 
   const characters = [
     {
@@ -247,8 +247,11 @@ export default function Home() {
     setShowStartPopup(false);
   };
 
-  const handleShowStakePopupFromRoomJoin = () => {
+  const handleShowStakePopupFromRoomJoin = (roomStakeAmount?: number) => {
     setStakingFromRoomJoin(true);
+    if (roomStakeAmount) {
+      setStakeAmount(roomStakeAmount);
+    }
     setShowStakePopup(true);
     setShowStartPopup(false); // Close the room join popup
   };
@@ -1070,7 +1073,7 @@ export default function Home() {
           <div className="absolute inset-0 bg-gradient-to-b from-black via-black/80 to-black opacity-90 z-40"></div>
 
           {/* Modal Window */}
-          <div className="relative z-50 bg-[#343B50] border-2 border-white rounded-2xl max-w-2xl w-full max-h-[90vh]">
+          <div className="relative z-50 bg-[#343B50] border-2 border-white rounded-2xl max-w-md w-full max-h-[90vh]">
             {/* Close Button */}
             <button
               className="absolute top-1 -right-3 hover:cursor-pointer"
@@ -1087,90 +1090,36 @@ export default function Home() {
                   "1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000",
               }}
             >
-              STAKE
+              JOIN ROOM
             </h2>
             <hr className="w-full border-t-2" />
 
             {/* Content */}
             <div className="p-8 flex flex-col gap-6">
-              {/* Custom stake amount field */}
-              {/* <div className="text-white text-md font-medium tracking-wide">
-              Balance: <span className="text-yellow-400">{parseFloat(tokenBalance).toFixed(4)} ESTK</span>
-            </div> */}
-              <div className="flex flex-col gap-1">
-                <label
-                  className="text-white text-2xl font-bold tracking-wider pl-1"
-                  style={{
-                    textShadow:
-                      "1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000",
-                  }}
-                >
-                  Custom Amount
-                </label>
-                <input
-                  type="number"
-                  placeholder="Enter custom amount"
-                  min="10"
-                  value={stakeAmount}
-                  onChange={(e) => setStakeAmount(Number(e.target.value))}
-                  className="w-full px-4 py-3 rounded-lg bg-white text-gray-700 text-lg border-2 border-gray-300 focus:outline-none"
-                />
-                <button
-                  onClick={() =>
-                    setStakeAmount(Number(parseFloat(tokenBalance).toFixed(4)))
-                  }
-                  className="bg-yellow-400 px-4 rounded-lg text-black font-semibold hover:bg-yellow-300 transition"
-                >
-                  MAX
-                </button>
+              {/* Room Staking Amount Display */}
+              <div className="text-center">
+                <div className="text-white text-lg font-medium mb-2">
+                  Required Stake Amount:
+                </div>
+                <div className="text-yellow-400 text-3xl font-bold">
+                  {stakeAmount} STK
+                </div>
               </div>
 
-              {/* Preset amounts - first row */}
-              <div className="flex flex-col gap-2">
-                <label
-                  className="text-white text-xl font-bold tracking-wider pl-1"
-                  style={{
-                    textShadow:
-                      "1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000",
-                  }}
-                >
-                  Quick Select
-                </label>
-                <div className="flex gap-4 w-full">
-                  {[10, 15, 20].map((amount) => (
-                    <button
-                      key={amount}
-                      onClick={() => setStakeAmount(amount)}
-                      className={`flex-1 py-3 px-2 rounded-lg font-bold text-lg transition-all hover:cursor-pointer ${
-                        stakeAmount === amount
-                          ? "bg-yellow-400 text-gray-900 border-2 border-yellow-600"
-                          : "bg-gray-700 text-white hover:bg-gray-600"
-                      }`}
-                    >
-                      {amount} STK
-                    </button>
-                  ))}
+              {/* Current Balance */}
+              <div className="text-center">
+                <div className="text-white text-sm font-medium mb-1">
+                  Your Balance:
                 </div>
-
-                {/* Preset amounts - second row */}
-                <div className="flex gap-4 w-full mt-2">
-                  <button
-                    onClick={() => setStakeAmount(50)}
-                    className={`flex-1 py-3 px-2 rounded-lg font-bold text-lg transition-all hover:cursor-pointer ${
-                      stakeAmount === 50
-                        ? "bg-yellow-400 text-gray-900 border-2 border-yellow-600"
-                        : "bg-gray-700 text-white hover:bg-gray-600"
-                    }`}
-                  >
-                    50 STK
-                  </button>
+                <div className="text-green-400 text-lg font-semibold">
+                  {parseFloat(tokenBalance).toFixed(4)} STK
                 </div>
               </div>
 
               {/* Stake button */}
               <button
                 onClick={() => handleStaking(stakeAmount)}
-                className={`relative py-3 flex items-center justify-center mt-4 hover:cursor-pointer ${
+                className={`relative py-4 flex items-center justify-center mt-4 hover:cursor-pointer ${
                   stakeLoading ? "opacity-60 cursor-not-allowed" : ""
                 }`}
                 disabled={stakeLoading}
@@ -1184,7 +1133,7 @@ export default function Home() {
                       "1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000",
                   }}
                 >
-                  {stakeLoading ? "Staking..." : "Stake"}
+                  {stakeLoading ? "Joining..." : "Join Room"}
                 </span>
               </button>
             </div>
@@ -1232,6 +1181,8 @@ export default function Home() {
           setDuration={setDuration}
           mode={selectedMode}
           onShowStakePopup={handleShowStakePopupFromRoomJoin}
+          stakingAmount={stakeAmount}
+          setStakingAmount={setStakeAmount}
         />
       )}
 
