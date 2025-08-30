@@ -127,6 +127,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [zoneCode, setZoneCode] = useState(null);
   const [duration, setDuration] = useState("1 Min");
+  const [stakingFromRoomJoin, setStakingFromRoomJoin] = useState(false);
 
   const characters = [
     {
@@ -234,8 +235,8 @@ export default function Home() {
       alert("Please select a play mode (Solo/Team) before staking.");
       return;
     }
-     setShowStakePopup(true);
-    // handleOpenStartPopup();
+    //  setShowStakePopup(true);
+    handleOpenStartPopup();
   };
 
   const handleOpenStartPopup = () => {
@@ -244,6 +245,12 @@ export default function Home() {
 
   const handleCloseStartPopup = () => {
     setShowStartPopup(false);
+  };
+
+  const handleShowStakePopupFromRoomJoin = () => {
+    setStakingFromRoomJoin(true);
+    setShowStakePopup(true);
+    setShowStartPopup(false); // Close the room join popup
   };
 
   const handleCloseGameFrame = () => {
@@ -281,7 +288,14 @@ export default function Home() {
         console.log("📄 Stake history added successfully.");
       }
       setShowStakePopup(false);
-      handleOpenStartPopup();
+      
+      // Check if staking was triggered from room join
+      if (stakingFromRoomJoin) {
+        setStakingFromRoomJoin(false); // Reset the flag
+        setShowGameFrame(true); // Show the iframe instead of start popup
+      } else {
+        handleOpenStartPopup(); // Original behavior for normal staking
+      }
     } catch (error) {
       console.error("Staking failed:", error);
     } finally {
@@ -1217,6 +1231,7 @@ export default function Home() {
           duration={duration}
           setDuration={setDuration}
           mode={selectedMode}
+          onShowStakePopup={handleShowStakePopupFromRoomJoin}
         />
       )}
 

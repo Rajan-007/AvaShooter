@@ -26,6 +26,7 @@ interface RoomPopupProps {
   mode: "solo" | "team";
   setMode: (mode: "solo" | "team") => void;
   setSoldierName: (name: string) => void;
+  onShowStakePopup: () => void; // Added prop for staking popup
 }
 
 const RoomPopup: React.FC<RoomPopupProps> = ({
@@ -37,6 +38,7 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
   setDuration,
   mode,
   setSoldierName,
+  onShowStakePopup, // Destructure new prop
 }) => {
   const [zoneOptions, setZoneOptions] = useState<ZoneOption[]>([]);
   const [remainingTimes, setRemainingTimes] = useState<Record<string, number>>(
@@ -209,49 +211,31 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
   };
 
   const handleJoinZone = async () => {
+    console.log("handleJoinZone called");
+    console.log("joinZoneId:", joinZoneId);
+    console.log("walletAddress:", walletAddress);
+    
     try {
-      // alert("Joining room...: " + joinZoneId);
       if (!joinZoneId) {
+        console.log("No zone selected, showing alert");
         alert("Please select a zone first");
+        return;
       }
       if (!walletAddress) {
         throw new Error("Wallet address is required to join a room");
       }
-      const response = await fetch(`${BACKEND_URL}/api/room/join`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          roomId: joinZoneId, // Use the selected zoneCode instead of joinZoneId
-          walletAddress: walletAddress,
-        }),
-      });
-
-      const result = await response.json();
-      console.log("Join room response:", result);
-
-      if (!response.ok) {
-        const errorMessage =
-          result.message ||
-          result.error ||
-          response.statusText ||
-          "Failed to join room";
-        console.error("Failed to join room:", errorMessage, result);
-        setError(errorMessage);
-        return;
-      }
-
-      if (response.ok) {
-        alert("Joined in room Successfully");
-      }
-
-      setZoneCode(result.roomId);
-      // handleStartGame(true, false);
+      
+      // Store the selected room info for later use after staking
+      setZoneCode(joinZoneId);
+      
+      // Show staking popup instead of directly joining
+      console.log("Showing staking popup");
+      onShowStakePopup();
+      
     } catch (err) {
-      console.error("Error joining room:", err);
+      console.error("Error in handleJoinZone:", err);
       setError(
-        err instanceof Error ? err.message : "Failed to connect to server"
+        err instanceof Error ? err.message : "Failed to process join request"
       );
     }
   };
