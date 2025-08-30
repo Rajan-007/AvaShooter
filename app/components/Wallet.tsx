@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import BtnTemp from '../assets/btn-template.svg';
 import { IoIosWallet } from "react-icons/io";
 import { BACKEND_URL } from '@/lib/constant';
+import toast from 'react-hot-toast';
 
 interface UserData {
     _id: string,
@@ -52,20 +53,37 @@ export const CustomWallet = ({
 
       try {
         const response = await fetch(`${BACKEND_URL}/api/user/${walletAddress}`);
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            // Only show modal for new users
+            setPendingWalletAddress(walletAddress);
+            setShowModal(true);
+            setFetchedUserData(null);
+                  } else {
+          console.error("❌ Server error:", response.status);
+          toast.error("Server error occurred while fetching user data");
+          setFetchedUserData(null);
+        }
+          return;
+        }
 
-        if (response.status === 404) {
-          // Show modal instead of prompt
-          setPendingWalletAddress(walletAddress);
-          setShowModal(true);
-        } else if (response.ok) {
-          const data = await response.json();
+        const data = await response.json();
+        
+        if (data) {
+          // User exists, update the data
           setFetchedUserData(data);
+          setShowModal(false); // Ensure modal is closed
           console.log("👤 User exists:", data);
         } else {
-          console.error("❌ Unexpected error:", await response.text());
+          console.error("❌ No data received");
+          toast.error("No user data received from server");
+          setFetchedUserData(null);
         }
       } catch (error) {
         console.error("❌ Error checking/setting up user:", error);
+        toast.error("Failed to connect to server. Please check your connection.");
+        setFetchedUserData(null);
       }
     };
 
