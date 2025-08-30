@@ -110,9 +110,13 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
       // Initialize remaining times
       const initialTimes: Record<string, number> = {};
       rooms.forEach((room: ZoneOption) => {
-        initialTimes[room.id] = room.gameStarted
-          ? room.availableDuration
-          : room.duration;
+        if (room.gameStarted) {
+          // If game is started, use available duration (time remaining)
+          initialTimes[room.id] = room.availableDuration || room.duration;
+        } else {
+          // If game not started, use full duration
+          initialTimes[room.id] = room.duration;
+        }
       });
       setRemainingTimes(initialTimes);
 
@@ -136,27 +140,34 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
     // Initial fetch
     fetchRooms();
 
-    // Set up polling interval (e.g., every 10 seconds)
-    // const pollingInterval = setInterval(fetchRooms, 10000);
+    // Set up polling interval to keep rooms updated
+    const pollingInterval = setInterval(fetchRooms, 5000); // Every 5 seconds
 
-    // return () => {
-    //   clearInterval(pollingInterval);
-    // };
+    return () => {
+      clearInterval(pollingInterval);
+    };
   }, [fetchRooms]);
 
   useEffect(() => {
-    // Timer for countdown - only runs when zoneOptions changes
+    // Timer for countdown - runs every second
     const timer = setInterval(() => {
       setRemainingTimes((prevTimes) => {
         const newTimes: Record<string, number> = {};
         let shouldUpdate = false;
 
         zoneOptions.forEach((zone) => {
-          if (zone.gameStarted && prevTimes[zone.id] > 0) {
-            newTimes[zone.id] = prevTimes[zone.id] - 1;
-            shouldUpdate = true;
+          if (zone.gameStarted) {
+            // If game is started, count down from available duration
+            const currentTime = prevTimes[zone.id] || zone.availableDuration;
+            if (currentTime > 0) {
+              newTimes[zone.id] = currentTime - 1;
+              shouldUpdate = true;
+            } else {
+              newTimes[zone.id] = 0;
+            }
           } else {
-            newTimes[zone.id] = prevTimes[zone.id] || zone.duration;
+            // If game not started, show full duration
+            newTimes[zone.id] = zone.duration;
           }
         });
 
@@ -569,11 +580,53 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
     }
   };
 
-  const handleGameStart = () => {
+  const handleGameStart = async () => {
     setShowStakePopup(false);
     setShowGameIframe(true);
-    // Here you can also trigger the room timer to start
-    toast.success("Game started! Room timer is now running.");
+    
+    try {
+      // First join the room if not already joined
+      const joinResponse = await fetch(`${BACKEND_URL}/api/room/join`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          roomId: selectedRoomId,
+          walletAddress: walletAddress,
+        }),
+      });
+
+      if (!joinResponse.ok) {
+        const joinError = await joinResponse.json();
+        console.log("Join room response:", joinError);
+        // Continue anyway as user might already be in room
+      }
+
+      // Start the game timer on the backend
+      const startResponse = await fetch(`${BACKEND_URL}/api/rooms/start-game`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          roomId: selectedRoomId,
+          walletAddress: walletAddress,
+        }),
+      });
+
+      if (startResponse.ok) {
+        toast.success("Game started! Room timer is now running.");
+        // Refresh the rooms to update the timer status
+        fetchRooms();
+      } else {
+        const error = await startResponse.json();
+        toast.error(error.message || "Failed to start game timer");
+      }
+    } catch (err) {
+      console.error("Error starting game:", err);
+      toast.error("Failed to start game timer");
+    }
   };
 
   const handleCloseGame = () => {

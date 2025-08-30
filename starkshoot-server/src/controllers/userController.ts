@@ -452,6 +452,44 @@ export const getRoomDetails = async (req: Request, res: Response) => {
   }
 };
 
+export const startGame = async (req: Request, res: Response) => {
+  const { roomId, walletAddress } = req.body;
+
+  try {
+    const room = await Room.findOne({ roomId });
+
+    if (!room) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+
+    // Check if the user is part of the room
+    if (!room.users.includes(walletAddress)) {
+      return res.status(400).json({ error: 'User not in this room' });
+    }
+
+    // Start the game if not already started
+    if (!room.gameStarted) {
+      room.gameStarted = true;
+      room.startedAt = new Date();
+      await room.save();
+    }
+
+    res.json({
+      success: true,
+      message: 'Game started successfully',
+      room: {
+        roomId: room.roomId,
+        gameStarted: room.gameStarted,
+        startedAt: room.startedAt,
+        duration: room.Duration
+      }
+    });
+  } catch (err) {
+    console.error('Error in startGame:', err);
+    res.status(500).json({ error: 'Failed to start game' });
+  }
+};
+
 export const makeWinner = async (req: Request, res: Response) => {
   const { roomId, walletAddress } = req.body;
 

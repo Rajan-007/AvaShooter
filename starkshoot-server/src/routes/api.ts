@@ -25,6 +25,7 @@ import {
     addLeaderboardEntry,
 
     getRoomDetails,
+    startGame,
 
 } from '../controllers/userController';
 
@@ -72,6 +73,14 @@ router.get('/rooms/:roomId', async (req, res, next) => {
 router.post('/rooms/make-winner', async (req, res, next) => {
     try {
         await makeWinner(req, res);
+    } catch (err) {
+        next(err);
+    }
+});
+
+router.post('/rooms/start-game', async (req, res, next) => {
+    try {
+        await startGame(req, res);
     } catch (err) {
         next(err);
     }
