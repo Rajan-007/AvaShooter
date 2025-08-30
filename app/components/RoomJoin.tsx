@@ -3,6 +3,8 @@ import { AngleClipButton } from "./Button";
 import { BACKEND_URL } from "@/lib/constant";
 import { RiRefreshFill } from "react-icons/ri";
 import toast from "react-hot-toast";
+import StartPopUp from "./StartPopUp";
+import GameIframe from "./GameIframe";
 
 interface ZoneOption {
   name: string;
@@ -47,6 +49,10 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
   stakingAmount = 10, // Default staking amount
   setStakingAmount, // Prop to update staking amount
 }) => {
+  const [showStakePopup, setShowStakePopup] = useState(false);
+  const [showGameIframe, setShowGameIframe] = useState(false);
+  const [selectedRoomStakeAmount, setSelectedRoomStakeAmount] = useState<number>(10);
+  const [selectedRoomId, setSelectedRoomId] = useState<string>('');
   const [zoneOptions, setZoneOptions] = useState<ZoneOption[]>([]);
   const [remainingTimes, setRemainingTimes] = useState<Record<string, number>>(
     {}
@@ -271,7 +277,9 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
       
       // Show staking popup with the room's staking amount
       console.log("Showing staking popup for room:", selectedRoom.name, "with stake:", selectedRoom.stakingAmount);
-      onShowStakePopup(selectedRoom.stakingAmount);
+      setSelectedRoomStakeAmount(selectedRoom.stakingAmount || 10);
+      setSelectedRoomId(selectedRoom.name);
+      setShowStakePopup(true);
       
     } catch (err) {
       console.error("Error in handleJoinZone:", err);
@@ -560,6 +568,41 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
       );
     }
   };
+
+  const handleGameStart = () => {
+    setShowStakePopup(false);
+    setShowGameIframe(true);
+    // Here you can also trigger the room timer to start
+    toast.success("Game started! Room timer is now running.");
+  };
+
+  const handleCloseGame = () => {
+    setShowGameIframe(false);
+    handleCloseStartPopup();
+  };
+
+  // Show game iframe if active
+  if (showGameIframe) {
+    return (
+      <GameIframe 
+        roomId={selectedRoomId} 
+        onClose={handleCloseGame} 
+      />
+    );
+  }
+
+  // Show stake popup if active
+  if (showStakePopup) {
+    return (
+      <StartPopUp
+        open={showStakePopup}
+        onClose={() => setShowStakePopup(false)}
+        stakeAmount={selectedRoomStakeAmount}
+        onGameStart={handleGameStart}
+        roomId={selectedRoomId}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black opacity-80 z-50">

@@ -44,6 +44,7 @@ import { useAccount } from "wagmi";
 import { BACKEND_URL } from "@/lib/constant";
 import { FaHistory } from "react-icons/fa";
 import RoomJoin from "./components/RoomJoin";
+import StartPopup from "./components/StartPopUp";
 
 // Add interface for Popup props
 // interface PopupProps {
@@ -1068,79 +1069,15 @@ export default function Home() {
       )}
 
       {showStakePopup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          {/* Background Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-b from-black via-black/80 to-black opacity-90 z-40"></div>
-
-          {/* Modal Window */}
-          <div className="relative z-50 bg-[#343B50] border-2 border-white rounded-2xl max-w-md w-full max-h-[90vh]">
-            {/* Close Button */}
-            <button
-              className="absolute top-1 -right-3 hover:cursor-pointer"
-              onClick={() => setShowStakePopup(false)}
-            >
-              <Image src={Close} alt="Close" width={60} height={60} />
-            </button>
-
-            {/* Header */}
-            <h2
-              className="text-2xl font-bold text-white my-3 text-center"
-              style={{
-                textShadow:
-                  "1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000",
-              }}
-            >
-              JOIN ROOM
-            </h2>
-            <hr className="w-full border-t-2" />
-
-            {/* Content */}
-            <div className="p-8 flex flex-col gap-6">
-              {/* Room Staking Amount Display */}
-              <div className="text-center">
-                <div className="text-white text-lg font-medium mb-2">
-                  Required Stake Amount:
-                </div>
-                <div className="text-yellow-400 text-3xl font-bold">
-                  {stakeAmount} STK
-                </div>
-              </div>
-
-              {/* Current Balance */}
-              <div className="text-center">
-                <div className="text-white text-sm font-medium mb-1">
-                  Your Balance:
-                </div>
-                <div className="text-green-400 text-lg font-semibold">
-                  {parseFloat(tokenBalance).toFixed(4)} STK
-                </div>
-              </div>
-
-              {/* Stake button */}
-              <button
-                onClick={() => handleStaking(stakeAmount)}
-                className={`relative py-4 flex items-center justify-center mt-4 hover:cursor-pointer ${
-                  stakeLoading ? "opacity-60 cursor-not-allowed" : ""
-                }`}
-                disabled={stakeLoading}
-                style={{ filter: "drop-shadow(0 4px 0 rgba(0,0,0,0.5))" }}
-              >
-                <div className="absolute inset-0 bg-yellow-400 rounded-lg border-b-4 border-yellow-600"></div>
-                <span
-                  className="relative z-10 text-xl font-bold tracking-wider"
-                  style={{
-                    textShadow:
-                      "1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000",
-                  }}
-                >
-                  {stakeLoading ? "Joining..." : "Join Room"}
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
+        <StartPopup
+        open={showStakePopup}
+        onClose={() => setShowStakePopup(false)}
+        stakeAmount={stakeAmount} // string or number in tokens, e.g. "1.25"
+        closeImageSrc={Close}     // your imported image module from next/image
+      />
+      
+      )}    
+      
       {showModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="bg-white rounded-lg p-6 w-80 shadow-lg text-black">
