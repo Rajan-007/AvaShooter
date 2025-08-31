@@ -4,14 +4,16 @@ import {
   baseSepolia,
   sepolia,
   somniaTestnet,
+  avalancheFuji,
 } from 'wagmi/chains';
 
 export const config = getDefaultConfig({
-  appName: 'RainbowKit demo',
+  appName: 'AvaShooter Game',
   projectId: 'YOUR_PROJECT_ID',
   chains: [
-    baseSepolia,
+    avalancheFuji, // Primary chain - Avalanche Fuji testnet
     sepolia,
+    baseSepolia,
     somniaTestnet,
     ...(process.env.NEXT_PUBLIC_ENABLE_TESTNETS === 'true' ? [somniaTestnet] : []),
   ],

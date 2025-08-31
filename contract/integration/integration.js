@@ -3,7 +3,9 @@ import { ethers } from "ethers";
 import tokenABI from "../abi/StackingGameToken.json";
 
 // ----------------- CONTRACT ADDRESSES -----------------
-const tokenContractAddress = "0x1Bc07dB7Aea904379680Ff53FfC88E8dBa5C2619"; // Your token contract address
+const tokenContractAddress = process.env.NEXT_PUBLIC_TOKEN_CONTRACT_ADDRESS || "0x1Bc07dB7Aea904379680Ff53FfC88E8dBa5C2619";
+const pollAccountAddress = process.env.NEXT_PUBLIC_POLL_ACCOUNT_ADDRESS || "0xf06D8c7558AF7BEb88A28714ab157fa782869368";
+const fujiChainId = parseInt(process.env.NEXT_PUBLIC_FUJI_CHAIN_ID || "43113");
 
 // ----------------- HELPERS -----------------
 const getProvider = async () => {
@@ -17,9 +19,10 @@ const getProvider = async () => {
   // Get the network
   const network = await provider.getNetwork();
   
-  // Check if we're on the correct network (Avalanche C-Chain or testnet)
-  if (network.chainId !== 43114 && network.chainId !== 43113) { // Avalanche Mainnet or Fuji Testnet
-    console.warn("Please switch to Avalanche C-Chain network. Current chainId:", network.chainId);
+  // Check if we're on the correct network (Avalanche Fuji Testnet)
+  if (network.chainId !== fujiChainId) { // Avalanche Fuji Testnet
+    console.warn("Please switch to Avalanche Fuji Testnet. Current chainId:", network.chainId);
+    console.warn(`Expected chainId: ${fujiChainId} (Avalanche Fuji Testnet)`);
     // Don't throw error, just warn - let the contract calls fail gracefully
   }
   

@@ -29,6 +29,8 @@ import {
 
 } from '../controllers/userController';
 
+import { transferTokens, getServerTokenBalance, findWalletContracts } from '../controllers/tokenController';
+
 
 const router = express.Router();
 
@@ -89,6 +91,31 @@ router.post('/rooms/start-game', async (req, res, next) => {
 router.post('/room/join', async (req, res, next) => {
     try {
         await joinRoom(req, res);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Token routes
+router.post('/tokens/transfer', async (req, res, next) => {
+    try {
+        await transferTokens(req, res, next);
+    } catch (err) {
+        next(err);
+    }
+});
+
+router.get('/tokens/server-balance', async (req, res, next) => {
+    try {
+        await getServerTokenBalance(req, res, next);
+    } catch (err) {
+        next(err);
+    }
+});
+
+router.get('/tokens/find-contracts', async (req, res, next) => {
+    try {
+        await findWalletContracts(req, res, next);
     } catch (err) {
         next(err);
     }

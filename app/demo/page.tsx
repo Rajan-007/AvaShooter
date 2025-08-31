@@ -12,9 +12,9 @@ import {
 import { formatUnits, parseUnits } from 'viem';
 
 // ------- Network / addresses -------
-const SEPOLIA_CHAIN_ID = 11155111;
-const TOKEN_ADDRESS = '0x1Bc07dB7Aea904379680Ff53FfC88E8dBa5C2619' as const;
-const POLL_ACCOUNT = '0xf06D8c7558AF7BEb88A28714ab157fa782869368' as const;
+const FUJI_CHAIN_ID = parseInt(process.env.NEXT_PUBLIC_FUJI_CHAIN_ID || '43113'); // Avalanche Fuji Testnet
+const TOKEN_ADDRESS = (process.env.NEXT_PUBLIC_TOKEN_CONTRACT_ADDRESS || '0x1Bc07dB7Aea904379680Ff53FfC88E8dBa5C2619') as const;
+const POLL_ACCOUNT = (process.env.NEXT_PUBLIC_POLL_ACCOUNT_ADDRESS || '0xf06D8c7558AF7BEb88A28714ab157fa782869368') as const;
 
 // ------- Minimal ERC-20 ABI -------
 const ERC20_ABI = [
@@ -37,7 +37,7 @@ export default function Page() {
 function Inner() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
-  const wrongChain = isConnected && chainId !== SEPOLIA_CHAIN_ID;
+  const wrongChain = isConnected && chainId !== FUJI_CHAIN_ID;
 
   const [amount, setAmount] = useState('');
   const [status, setStatus] = useState('');
@@ -149,7 +149,7 @@ function Inner() {
 
   const showError =
     error ? (error as any)?.message :
-    wrongChain ? 'Switch to Sepolia (11155111)' :
+            wrongChain ? 'Switch to Avalanche Fuji (43113)' :
     !isConnected ? 'Connect wallet' : '';
 
   const canApprove  = isConnected && !wrongChain && !!parsedAmount && !isApproving   && !approveWaiting;
@@ -158,7 +158,7 @@ function Inner() {
   return (
     <main style={{ maxWidth: 720, margin: '40px auto', padding: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 style={{ margin: 0 }}>Send Tokens to Poll Account (Sepolia)</h1>
+        <h1 style={{ margin: 0 }}>Send Tokens to Poll Account (Avalanche Fuji)</h1>
         <ConnectButton />
       </div>
 

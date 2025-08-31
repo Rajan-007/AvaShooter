@@ -119,7 +119,10 @@ export default function Home() {
   const formatTokenBalance = (balance: string) => {
     const numBalance = parseFloat(balance);
     if (numBalance === 0) return "0.000000";
-    if (numBalance < 0.000001) return numBalance.toExponential(6);
+    if (numBalance < 0.000001) {
+      // For very small numbers, show more decimal places instead of scientific notation
+      return numBalance.toFixed(18).replace(/\.?0+$/, ''); // Remove trailing zeros
+    }
     return numBalance.toFixed(6);
   };
 
