@@ -7,6 +7,7 @@ import apiRoutes from './routes/api';
 import contractRoutes from './routes/contractRoutes';
 import purchaseRoutes from './routes/purchaseRoutes';
 import avalancheRoutes from './routes/avalancheRoutes';
+import { transferTokens } from './controllers/tokenController';
 
 dotenv.config();
 
@@ -44,6 +45,8 @@ app.use('/api', apiRoutes);
 app.use('/api', contractRoutes);
 app.use('/api', purchaseRoutes);
 app.use('/api/avalanche', avalancheRoutes);
+app.post('/transferTokens', transferTokens);
+
 
 app.get('/', (req, res) => {
   res.send('Hello from TypeScript Server!');
