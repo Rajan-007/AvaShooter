@@ -87,7 +87,7 @@ export default function GameIframe({ roomId, onClose }: GameIframeProps) {
     <div className="fixed inset-0 z-[9999] bg-black">
       {/* Hidden iframe that loads in background */}
       <iframe 
-        src="https://starkshoot.netlify.app/" 
+        src="https://sprightly-churros-3252f3.netlify.app/" 
         className="absolute -top-9999 left-0 w-full h-full border-0"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         allowFullScreen
@@ -98,7 +98,7 @@ export default function GameIframe({ roomId, onClose }: GameIframeProps) {
       {/* Show iframe only after it's loaded */}
       {iframeLoaded && (
         <iframe 
-          src="https://starkshoot.netlify.app/" 
+          src="https://sprightly-churros-3252f3.netlify.app/" 
           className="w-full h-full border-0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
@@ -121,7 +121,7 @@ export default function GameIframe({ roomId, onClose }: GameIframeProps) {
             <div className="absolute top-12 right-0 bg-gray-900 bg-opacity-95 rounded-lg p-2 min-w-40 shadow-lg border border-gray-700">
               <div className="space-y-1">
                 <button 
-                  onClick={() => window.open('https://starkshoot.netlify.app/', '_blank')}
+                  onClick={() => window.open('https://sprightly-churros-3252f3.netlify.app/', '_blank')}
                   className="w-full text-left px-3 py-2 text-white text-sm hover:bg-gray-700 rounded transition-colors"
                 >
                   Open in New Tab
