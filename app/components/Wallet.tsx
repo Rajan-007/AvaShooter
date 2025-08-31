@@ -17,12 +17,8 @@ interface UserData {
 }
 
 export const CustomWallet = ({
-  setShowModal,
-  setPendingWalletAddress,
   setFetchedUserData
 }: {
-  setShowModal: (value: boolean) => void;
-  setPendingWalletAddress: (address: string | null) => void;
   setFetchedUserData: (data: UserData | null) => void;
 }) => {
   // Track connection status in component state
@@ -47,50 +43,40 @@ export const CustomWallet = ({
     }
   }, [isWalletConnected, walletAddress, setFetchedUserData]);
 
+  // Fetch user data when wallet is connected
   useEffect(() => {
-    const checkAndSetupUser = async () => {
-      if (!walletAddress) return;
+    const fetchUserData = async () => {
+      if (!walletAddress || !isWalletConnected) return;
 
       try {
         const response = await fetch(`${BACKEND_URL}/api/user/${walletAddress}`);
         
-        if (!response.ok) {
-          if (response.status === 404) {
-            // Only show modal for new users
-            setPendingWalletAddress(walletAddress);
-            setShowModal(true);
+        if (response.ok) {
+          const data = await response.json();
+          if (data) {
+            setFetchedUserData(data);
+            console.log("👤 User data fetched:", data);
+          } else {
+            console.log("❌ No user data found");
             setFetchedUserData(null);
-                  } else {
+          }
+        } else if (response.status === 404) {
+          console.log("❌ User not found");
+          setFetchedUserData(null);
+        } else {
           console.error("❌ Server error:", response.status);
           toast.error("Server error occurred while fetching user data");
           setFetchedUserData(null);
         }
-          return;
-        }
-
-        const data = await response.json();
-        
-        if (data) {
-          // User exists, update the data
-          setFetchedUserData(data);
-          setShowModal(false); // Ensure modal is closed
-          console.log("👤 User exists:", data);
-        } else {
-          console.error("❌ No data received");
-          toast.error("No user data received from server");
-          setFetchedUserData(null);
-        }
       } catch (error) {
-        console.error("❌ Error checking/setting up user:", error);
+        console.error("❌ Error fetching user data:", error);
         toast.error("Failed to connect to server. Please check your connection.");
         setFetchedUserData(null);
       }
     };
 
-    if (isWalletConnected) {
-      checkAndSetupUser();
-    }
-  }, [walletAddress, isWalletConnected]);
+    fetchUserData();
+  }, [walletAddress, isWalletConnected, setFetchedUserData]);
 
   return (
     <ConnectButton.Custom>

@@ -27,24 +27,21 @@ import ItemGrenade from "../public/images/items/grenade.png";
 import ItemDiamond from "../public/images/items/diamond.png";
 import ItemGold from "../public/images/items/gold.png";
 import LeaderboardPopup from "./components/LeaderboardPopup";
-import { FaAward } from "react-icons/fa6";
+
 
 import Image from "next/image";
 import { CustomWallet } from "./components/Wallet";
 import SimpleGameFrame from "./components/iframe";
 import {
-  CLAIM_REWARDS,
-  GET_ALL_STAKE_INFO,
-  stakeTokens,
-  approveStakingTokens,
-  claimRewards,
   getStakingTokenBalance,
+  getTokenSymbol,
 } from "@/contract/integration/integration";
 import { useAccount } from "wagmi";
-import { BACKEND_URL } from "@/lib/constant";
+import { ethers } from "ethers";
+
 import { FaHistory } from "react-icons/fa";
 import RoomJoin from "./components/RoomJoin";
-import StartPopup from "./components/StartPopUp";
+
 
 // Add interface for Popup props
 // interface PopupProps {
@@ -63,13 +60,7 @@ interface UserData {
   username: string;
 }
 
-interface StakeData {
-  _id: string;
-  walletAddress: string;
-  amount: number;
-  timestamp: string;
-  __v: number;
-}
+
 
 export interface UserInfo {
   walletAddress: string;
@@ -87,48 +78,40 @@ export default function Home() {
   const [showShopPopup, setShowShopPopup] = useState(false);
   const [showStartPopup, setShowStartPopup] = useState(false);
   const [showLeaderPopup, setShowLeaderPopup] = useState(false);
-  const [showStakePopup, setShowStakePopup] = useState(false);
-  const [showClaimPopup, setShowClaimPopup] = useState(false);
+
+
   const [shopCategory, setShopCategory] =
     useState<keyof typeof shopItems>("Guns");
   const [selectedMode, setSelectedMode] = useState<"solo" | "team" | null>(
     "solo"
   );
   const [showGameFrame, setShowGameFrame] = useState(false);
-  const [stakeAmount, setStakeAmount] = useState(10);
-  const [stakeLoading, setStakeLoading] = useState(false);
-  const [stakingFromRoomJoin, setStakingFromRoomJoin] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [transactionHash, setTransactionHash] = useState<string | null>(null);
+
   // const [playerName, setPlayerName] = useState('');
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [roomId, setRoomId] = useState("");
   const [tokenBalance, setTokenBalance] = useState("0");
-  const [stakeInfo, setStakeInfo] = useState<
-    Array<{
-      matchId: string;
-      staked: string;
-      reward: string;
-      isWinner: boolean;
-      claimed: boolean;
-    }>
-  >([]);
-  const [loadingInfo, setLoadingInfo] = useState(false);
-  const [claiming, setClaiming] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [claimSuccess, setClaimSuccess] = useState(false);
-  const [showModal, setShowModal] = useState(false);
-  const [userNameInput, setUserNameInput] = useState("");
-  const [pendingWalletAddress, setPendingWalletAddress] = useState("");
+  const [tokenSymbol, setTokenSymbol] = useState("AST");
+  const [loadingBalance, setLoadingBalance] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+
+
   const [fetchedUserData, setFetchedUserData] = useState<UserData | null>(null);
-  const [activeTab, setActiveTab] = useState<"reward" | "stake">("reward");
-  const [stakeHistory, setStakeHistory] = useState<StakeData[] | null>([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
+
   const [showHistoryPopup, setShowHistoryPopup] = useState(false);
   const [historyData, setHistoryData] = useState<RoomHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [zoneCode, setZoneCode] = useState(null);
   const [duration, setDuration] = useState("1 Min");
+
+  // Helper function to format token balance
+  const formatTokenBalance = (balance: string) => {
+    const numBalance = parseFloat(balance);
+    if (numBalance === 0) return "0.000000";
+    if (numBalance < 0.000001) return numBalance.toExponential(6);
+    return numBalance.toFixed(6);
+  };
 
   const characters = [
     {
@@ -233,10 +216,9 @@ export default function Home() {
 
   const handleStakePopup = () => {
     if (selectedMode === null) {
-      alert("Please select a play mode (Solo/Team) before staking.");
+      alert("Please select a play mode (Solo/Team) before starting.");
       return;
     }
-    //  setShowStakePopup(true);
     handleOpenStartPopup();
   };
 
@@ -248,165 +230,60 @@ export default function Home() {
     setShowStartPopup(false);
   };
 
-  const handleShowStakePopupFromRoomJoin = (roomStakeAmount?: number) => {
-    setStakingFromRoomJoin(true);
-    if (roomStakeAmount) {
-      setStakeAmount(roomStakeAmount);
-    }
-    setShowStakePopup(true);
-    setShowStartPopup(false); // Close the room join popup
-  };
-
   const handleCloseGameFrame = () => {
     setShowGameFrame(false);
   };
 
-  const handleStaking = async (stakeAmount: number) => {
-    setStakeLoading(true);
-    const walletAddress = account?.address;
-    try {
-      const result = await stakeTokens({ amount: stakeAmount });
-      console.log("Staking successful:", result);
-      const hash = result?.hash;
-      if (hash) {
-        setTransactionHash(hash);
-        console.log("Transaction Hash:", hash);
-      }
-      const historyRes = await fetch(`${BACKEND_URL}/api/stake/history/add`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          walletAddress,
-          amount: stakeAmount,
-        }),
-      });
 
-      if (!historyRes.ok) {
-        console.error(
-          "❌ Failed to log stake history:",
-          await historyRes.text()
-        );
-      } else {
-        console.log("📄 Stake history added successfully.");
-      }
-      setShowStakePopup(false);
-      
-      // Check if staking was triggered from room join
-      if (stakingFromRoomJoin) {
-        setStakingFromRoomJoin(false); // Reset the flag
-        setShowGameFrame(true); // Show the iframe instead of start popup
-      } else {
-        handleOpenStartPopup(); // Original behavior for normal staking
-      }
-    } catch (error) {
-      console.error("Staking failed:", error);
-    } finally {
-      setStakeLoading(false);
-    }
-  };
 
   const account = useAccount();
 
-  const fetchStakeInfo = async () => {
-    setLoadingInfo(true);
-    try {
-      if (account?.address) {
-        const result = await GET_ALL_STAKE_INFO(account?.address);
-        console.log("Stake Info:", result);
-        setStakeInfo(result || null);
-      }
-    } catch (error) {
-      console.error("Error fetching stake info", error);
-    } finally {
-      setLoadingInfo(false);
-    }
-  };
 
-  const claimReward = async () => {
-    setClaiming(true);
-    try {
-      const result = await claimRewards();
-      console.log("Claim rewards result", result);
-      setClaimSuccess(true);
-      await fetchStakeInfo();
-    } catch (error) {
-      console.error("Error claiming rewards", error);
-    } finally {
-      setClaiming(false);
-    }
-  };
 
   const fetchEStkBalance = async () => {
     if (account?.address) {
-      const result = await getStakingTokenBalance(account.address);
-      setTokenBalance(result || "0");
+      setLoadingBalance(true);
+      try {
+        const result = await getStakingTokenBalance(account.address);
+        console.log("Token balance result:", result);
+        setTokenBalance(result || "0.000000");
+        
+        // Also fetch token symbol
+        try {
+          const symbol = await getTokenSymbol();
+          setTokenSymbol(symbol);
+        } catch (symbolError) {
+          console.error("Error fetching token symbol:", symbolError);
+          setTokenSymbol("-AST"); // fallback
+        }
+      } catch (error) {
+        console.error("Error fetching token balance:", error);
+        setTokenBalance("0");
+      } finally {
+        setLoadingBalance(false);
+      }
     }
   };
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (account?.address) {
       fetchEStkBalance();
+    } else {
+      setTokenBalance("0.000000");
+      setTokenSymbol("AST");
+      setLoadingBalance(false);
     }
   }, [account?.address]);
 
-  useEffect(() => {
-    if (showClaimPopup && account?.address) {
-      fetchStakeInfo();
-      setClaimSuccess(false);
-    }
-  }, [showClaimPopup, account?.address]);
 
-  const handleUserSubmit = async () => {
-    if (!userNameInput || !pendingWalletAddress) return;
 
-    try {
-      const setupRes = await fetch(`${BACKEND_URL}/api/user/setup`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          walletAddress: pendingWalletAddress,
-          username: userNameInput,
-        }),
-      });
 
-      if (setupRes.ok) {
-        console.log("✅ User setup complete.");
-        setShowModal(false);
-        setUserNameInput("");
-      } else {
-        console.error("❌ Failed to create user:", await setupRes.text());
-      }
-    } catch (error) {
-      console.error("❌ Error setting up user:", error);
-    }
-  };
 
-  useEffect(() => {
-    const fetchStakeHistory = async () => {
-      if (activeTab === "stake" && account?.address) {
-        setLoadingHistory(true);
-        try {
-          const res = await fetch(
-            `${BACKEND_URL}/api/stake/history/${account?.address}`
-          );
-          const data = await res.json();
-          console.log("Stake history response:", data);
-          setStakeHistory(Array.isArray(data) ? data : []);
-        } catch (err) {
-          console.error("Failed to fetch stake history:", err);
-          setStakeHistory([]);
-        } finally {
-          setLoadingHistory(false);
-        }
-      }
-    };
 
-    fetchStakeHistory();
-  }, [activeTab, account?.address]);
 
   const handleCloseHistoryPopup = () => {
     setShowHistoryPopup(false);
@@ -460,7 +337,20 @@ export default function Home() {
                 height={30}
                 className="text-yellow-400"
               />
-              <span className="text-yellow-400 text-xl font-bold">2345</span>
+              <span className="text-yellow-400 text-xl font-bold">
+                {loadingBalance ? "Loading..." : `${formatTokenBalance(tokenBalance)} ${tokenSymbol}`}
+              </span>
+              {mounted && account?.address && (
+                <button
+                  onClick={fetchEStkBalance}
+                  disabled={loadingBalance}
+                  className="ml-2 text-yellow-400 hover:text-yellow-300 disabled:opacity-50"
+                  title="Refresh balance"
+                >
+                  🔄
+                </button>
+              )}
+
             </div>
           </div>
           <div className="relative flex flex-col items-center justify-center -mt-1 hover:cursor-pointer hover:scale-105 transition duration-300">
@@ -550,32 +440,13 @@ export default function Home() {
               </span>
             </div>
           </div>
-          <div
-            className="relative flex flex-col items-center justify-center -mt-1 hover:cursor-pointer hover:scale-105 transition duration-300"
-            onClick={() => setShowClaimPopup(true)}
-          >
-            <Image
-              src={BtnTemp}
-              alt="Button Template"
-              width={60}
-              height={60}
-              className="align-middle"
-            />
-            <div className="absolute flex flex-col items-center justify-center">
-              <FaAward className="text-2xl text-red-700" />
-              <span className="text-yellow-400 font-bold text-xs text-center relative bottom-2 mt-2">
-                CLAIM
-              </span>
-            </div>
-          </div>
+
           <div className="relative z-50">
-            <CustomWallet
-              setShowModal={setShowModal}
-              setPendingWalletAddress={(address: string | null) =>
-                setPendingWalletAddress(address || "")
-              }
-              setFetchedUserData={setFetchedUserData}
-            />
+            {mounted && (
+              <CustomWallet
+                setFetchedUserData={setFetchedUserData}
+              />
+            )}
           </div>
         </div>
       </header>
@@ -858,150 +729,7 @@ export default function Home() {
         </div>
       </main>
 
-      {showClaimPopup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          {/* Background Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-b from-black via-black/80 to-black opacity-90 z-40" />
 
-          {/* Modal Window */}
-          <div className="relative z-50 bg-[#343B50] border-2 border-white rounded-2xl max-w-2xl w-full max-h-[90vh] px-6 py-8 text-white overflow-auto">
-            {/* Close Button */}
-            <button
-              className="absolute top-2 right-2 hover:cursor-pointer"
-              onClick={() => setShowClaimPopup(false)}
-            >
-              <Image src={Close} alt="Close" width={60} height={60} />
-            </button>
-
-            {/* Header */}
-            <h2
-              className="text-3xl font-bold text-center mb-4"
-              style={{
-                textShadow:
-                  "1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000",
-              }}
-            >
-              REWARD
-            </h2>
-
-            <hr className="w-full border-t-2 border-white mb-4" />
-
-            {/* Tabs */}
-            <div className="flex justify-center gap-4 mb-6">
-              <button
-                onClick={() => setActiveTab("reward")}
-                className={`px-4 py-2 rounded-lg font-semibold ${
-                  activeTab === "reward"
-                    ? "bg-white text-black"
-                    : "bg-transparent border border-white"
-                }`}
-              >
-                Reward
-              </button>
-              <button
-                onClick={() => setActiveTab("stake")}
-                className={`px-4 py-2 rounded-lg font-semibold ${
-                  activeTab === "stake"
-                    ? "bg-white text-black"
-                    : "bg-transparent border border-white"
-                }`}
-              >
-                Stake
-              </button>
-            </div>
-
-            {/* Content */}
-            {activeTab === "reward" ? (
-              loadingInfo ? (
-                <p className="text-center text-lg">Fetching rewards...</p>
-              ) : stakeInfo && stakeInfo.length > 0 ? (
-                <div className="space-y-6">
-                  {stakeInfo.map((reward, index) => (
-                    <div
-                      key={index}
-                      className="border border-white rounded-xl p-4 text-center space-y-2"
-                    >
-                      <p className="text-lg font-semibold">
-                        🏠 Room ID: {reward.matchId}
-                      </p>
-                      <p>
-                        💰 Tokens Staked:{" "}
-                        <span className="font-semibold">
-                          {reward.staked} ETH
-                        </span>
-                      </p>
-                      <p>
-                        🎁 Reward:{" "}
-                        <span className="font-semibold">
-                          {reward.reward} STK
-                        </span>
-                      </p>
-
-                      {reward.isWinner ? (
-                        reward.claimed ? (
-                          <button
-                            disabled
-                            className="mt-2 px-4 py-2 text-sm rounded-lg bg-gray-500 text-white font-semibold cursor-not-allowed"
-                          >
-                            ✅ Claimed
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => claimReward(Number(reward.matchId))}
-                            disabled={claiming}
-                            className={`mt-2 px-4 py-2 text-sm rounded-lg bg-yellow-400 text-black font-bold hover:bg-yellow-300 transition ${
-                              claiming ? "opacity-50 cursor-not-allowed" : ""
-                            }`}
-                          >
-                            {claiming ? "Claiming..." : "Claim Reward"}
-                          </button>
-                        )
-                      ) : (
-                        <p className="text-red-400 font-medium">
-                          ❌ Not a winner
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-center text-red-400">
-                  No reward info found.
-                </p>
-              )
-            ) : (
-              <div className="text-left space-y-4 max-h-[300px] overflow-y-auto">
-                {loadingHistory ? (
-                  <p className="text-center text-lg">
-                    Loading stake history...
-                  </p>
-                ) : stakeHistory && stakeHistory.length > 0 ? (
-                  stakeHistory.map((entry, index) => (
-                    <div key={index} className="border-b border-white pb-2">
-                      <p className="text-sm">
-                        Amount:{" "}
-                        <span className="font-semibold">
-                          {entry.amount} ETH
-                        </span>
-                      </p>
-                      <p className="text-sm">
-                        Time:{" "}
-                        <span className="font-light">
-                          {new Date(entry.timestamp).toLocaleString()}
-                        </span>
-                      </p>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-center text-red-400">
-                    No stake history found.
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {showHistoryPopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -1068,44 +796,9 @@ export default function Home() {
         </div>
       )}
 
-      {showStakePopup && (
-        <StartPopup
-        open={showStakePopup}
-        onClose={() => setShowStakePopup(false)}
-        stakeAmount={stakeAmount} // string or number in tokens, e.g. "1.25"
-        closeImageSrc={Close}     // your imported image module from next/image
-      />
+    
       
-      )}    
-      
-      {showModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-          <div className="bg-white rounded-lg p-6 w-80 shadow-lg text-black">
-            <h2 className="text-lg font-semibold mb-4">Create a Username</h2>
-            <input
-              type="text"
-              className="w-full p-2 border rounded mb-4"
-              placeholder="Enter username"
-              value={userNameInput}
-              onChange={(e) => setUserNameInput(e.target.value)}
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                className="bg-gray-300 px-4 py-2 rounded"
-                onClick={() => setShowModal(false)}
-              >
-                Cancel
-              </button>
-              <button
-                className="bg-blue-600 text-white px-4 py-2 rounded"
-                onClick={handleUserSubmit}
-              >
-                Submit
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {showStartPopup && (
         <RoomJoin
@@ -1117,9 +810,6 @@ export default function Home() {
           duration={duration}
           setDuration={setDuration}
           mode={selectedMode}
-          onShowStakePopup={handleShowStakePopupFromRoomJoin}
-          stakingAmount={stakeAmount}
-          setStakingAmount={setStakeAmount}
         />
       )}
 

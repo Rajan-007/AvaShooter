@@ -66,10 +66,12 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
   const [error, setError] = useState("");
 
   // Memoized fetch function to prevent unnecessary recreations
-  const fetchRooms = useCallback(async () => {
+  const fetchRooms = useCallback(async (showLoading = false) => {
     try {
-      setError("");
-      setLoading(true);
+      if (showLoading) {
+        setError("");
+        setLoading(true);
+      }
       
       const response = await fetch(`${BACKEND_URL}/api/rooms/available`);
       
@@ -105,20 +107,37 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
         stakingToken: room.stakingToken,
       }));
 
-      setZoneOptions(rooms);
-
-      // Initialize remaining times
-      const initialTimes: Record<string, number> = {};
-      rooms.forEach((room: ZoneOption) => {
-        if (room.gameStarted) {
-          // If game is started, use available duration (time remaining)
-          initialTimes[room.id] = room.availableDuration || room.duration;
-        } else {
-          // If game not started, use full duration
-          initialTimes[room.id] = room.duration;
-        }
+      // Smooth update - only update if data actually changed
+      setZoneOptions(prevRooms => {
+        const hasChanged = JSON.stringify(prevRooms) !== JSON.stringify(rooms);
+        return hasChanged ? rooms : prevRooms;
       });
-      setRemainingTimes(initialTimes);
+
+      // Update remaining times smoothly
+      setRemainingTimes(prevTimes => {
+        const newTimes: Record<string, number> = {};
+        let hasChanged = false;
+        
+        rooms.forEach((room: ZoneOption) => {
+          const currentTime = prevTimes[room.id];
+          let newTime;
+          
+          if (room.gameStarted) {
+            // If game is started, use available duration (time remaining)
+            newTime = room.availableDuration || room.duration;
+          } else {
+            // If game not started, use full duration
+            newTime = room.duration;
+          }
+          
+          if (currentTime !== newTime) {
+            hasChanged = true;
+          }
+          newTimes[room.id] = newTime;
+        });
+        
+        return hasChanged ? newTimes : prevTimes;
+      });
 
       // Auto-select the first available room if none is selected
       if (rooms.length > 0 && !zoneCode) {
@@ -129,19 +148,23 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
        const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
        setError(errorMessage);
        console.error("Error fetching rooms:", err);
-       toast.error("Failed to fetch rooms: " + errorMessage);
+       if (showLoading) {
+         toast.error("Failed to fetch rooms: " + errorMessage);
+       }
        setZoneOptions([]);
      } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   }, [setZoneCode, setDuration, zoneCode]);
 
   useEffect(() => {
-    // Initial fetch
-    fetchRooms();
+    // Initial fetch with loading state
+    fetchRooms(true);
 
-    // Set up polling interval to keep rooms updated
-    const pollingInterval = setInterval(fetchRooms, 5000); // Every 5 seconds
+    // Set up polling interval to keep rooms updated silently
+    const pollingInterval = setInterval(() => fetchRooms(false), 3000); // Every 3 seconds, no loading state
 
     return () => {
       clearInterval(pollingInterval);
@@ -322,20 +345,18 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
                 Select Zone
               </label>
               <button
-                onClick={fetchRooms}
+                onClick={() => fetchRooms(true)}
                 disabled={loading}
-                className="flex items-center text-cyan-400 hover:text-cyan-300 text-sm disabled:text-gray-500"
+                className="flex items-center text-cyan-400 hover:text-cyan-300 text-sm disabled:text-gray-500 transition-colors"
               >
-                <RiRefreshFill className="w-7 h-7" />
+                <RiRefreshFill className={`w-7 h-7 ${loading ? 'animate-spin' : ''}`} />
               </button>
             </div>
-            {loading ? (
-              <div className="text-center py-4">Loading rooms...</div>
-            ) : error ? (
+            {error ? (
               <div className="text-red-500 text-center py-4">{error}</div>
             ) : (
               <div
-                className="space-y-4 h-64 overflow-y-auto "
+                className="space-y-4 h-64 overflow-y-auto transition-all duration-300 ease-in-out"
                 style={{
                   backgroundBlendMode: "overlay",
                   scrollbarWidth: "none",
@@ -350,7 +371,7 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
                   return (
                     <label
                       key={zone.id}
-                      className={`flex items-center justify-between w-full px-3 py-2 border rounded cursor-pointer space-x-2 transition-colors
+                      className={`flex items-center justify-between w-full px-3 py-2 border rounded cursor-pointer space-x-2 transition-all duration-200 ease-in-out
         ${
           isSelected
             ? "border-blue-500 bg-blue-500/10"
@@ -391,9 +412,14 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
                   );
                 })}
 
-                {filteredZoneOptions.length === 0 && (
+                {filteredZoneOptions.length === 0 && !loading && (
                   <div className="text-sm italic text-gray-200">
                     No rooms available. Try creating your own.
+                  </div>
+                )}
+                {filteredZoneOptions.length === 0 && loading && (
+                  <div className="text-sm italic text-gray-200">
+                    Loading rooms...
                   </div>
                 )}
               </div>
@@ -617,8 +643,8 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
 
       if (startResponse.ok) {
         toast.success("Game started! Room timer is now running.");
-        // Refresh the rooms to update the timer status
-        fetchRooms();
+              // Refresh the rooms to update the timer status
+      fetchRooms(false);
       } else {
         const error = await startResponse.json();
         toast.error(error.message || "Failed to start game timer");
