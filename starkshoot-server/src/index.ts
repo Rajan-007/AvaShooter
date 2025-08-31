@@ -19,9 +19,9 @@ console.log(`❄️  Avalanche features: ${env.hasAvalancheConfig ? 'Enabled' : 
 
 const app = express();
 
-// CORS configuration
+// CORS configuration - allow all origins
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001', 'http://127.0.0.1:3000', 'http://127.0.0.1:3001','https://ava-shooter-agyr.vercel.app/'],
+  origin: true, // Allow all origins
   credentials: true
 }));
 
