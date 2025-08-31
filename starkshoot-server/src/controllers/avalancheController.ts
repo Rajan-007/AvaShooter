@@ -3,6 +3,8 @@ import { ethers } from 'ethers';
 import AvalancheContractABI from '../abi/AvalancheContract.json';
 import { env } from '../config/env';
 import { initializePinata } from "./initializePinata";
+import AvalancheRoom from '../models/AvalancheRoom';
+import AvalancheTransaction from '../models/AvalancheTransaction';
 
 
 // Lazy initialization to prevent ENS errors on startup
@@ -70,15 +72,59 @@ export const createRoom = async (req: Request, res: Response): Promise<void> => 
     const tx = await avalancheContract.createRoom(roomId, ipfsLink);
 
     console.log(`📝 Transaction sent: ${tx.hash}`);
-    await tx.wait();
-
+    
+    // Wait for transaction confirmation
+    const receipt = await tx.wait();
     console.log(`✅ Room ${roomId} created successfully`);
+
+    // Save to MongoDB
+    try {
+      // Save room data
+      const avalancheRoom = new AvalancheRoom({
+        roomId,
+        ipfsHash: ipfsResult.IpfsHash,
+        ipfsLink,
+        txHash: tx.hash,
+        blockNumber: receipt?.blockNumber,
+        gasUsed: receipt?.gasUsed?.toString(),
+        gasPrice: tx.gasPrice?.toString(),
+        status: 'confirmed',
+        data
+      });
+      await avalancheRoom.save();
+
+      // Save transaction data
+      const avalancheTx = new AvalancheTransaction({
+        txHash: tx.hash,
+        roomId,
+        operation: 'create',
+        status: 'confirmed',
+        blockNumber: receipt?.blockNumber,
+        gasUsed: receipt?.gasUsed?.toString(),
+        gasPrice: tx.gasPrice?.toString(),
+        gasCost: receipt?.gasUsed ? (BigInt(receipt.gasUsed) * BigInt(tx.gasPrice || 0)).toString() : undefined,
+        from: tx.from,
+        to: tx.to,
+        value: tx.value?.toString(),
+        data: tx.data,
+        ipfsHash: ipfsResult.IpfsHash,
+        ipfsLink
+      });
+      await avalancheTx.save();
+
+      console.log(`💾 Saved room and transaction data to MongoDB`);
+    } catch (dbError) {
+      console.error('❌ Error saving to MongoDB:', dbError);
+      // Don't fail the request if MongoDB save fails
+    }
 
     res.json({
       success: true,
       txHash: tx.hash,
       roomId,
       ipfsLink,
+      blockNumber: receipt?.blockNumber,
+      gasUsed: receipt?.gasUsed?.toString(),
       message: "Room created successfully with IPFS data",
     });
   } catch (error: any) {
@@ -86,6 +132,153 @@ export const createRoom = async (req: Request, res: Response): Promise<void> => 
     res.status(500).json({
       success: false,
       error: error.message || "Internal server error",
+    });
+  }
+};
+
+// Get all rooms from MongoDB
+export const getAllRooms = async (req: Request, res: Response): Promise<void> => {
+  try {
+    console.log('📋 Get all rooms request received');
+    
+    const rooms = await AvalancheRoom.find({})
+      .sort({ createdAt: -1 })
+      .limit(100); // Limit to prevent overwhelming response
+    
+    console.log(`✅ Retrieved ${rooms.length} rooms from database`);
+    
+    res.json({
+      success: true,
+      rooms,
+      count: rooms.length
+    });
+  } catch (error: any) {
+    console.error('❌ Error getting all rooms:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error'
+    });
+  }
+};
+
+// Get room by ID from MongoDB
+export const getRoomById = async (req: Request, res: Response): Promise<void> => {
+  try {
+    console.log('📋 Get room by ID request received:', req.params);
+    
+    const { id } = req.params;
+    
+    const room = await AvalancheRoom.findOne({ roomId: id });
+    
+    if (!room) {
+      res.status(404).json({
+        success: false,
+        error: 'Room not found in database'
+      });
+      return;
+    }
+    
+    console.log(`✅ Retrieved room ${id} from database`);
+    
+    res.json({
+      success: true,
+      room
+    });
+  } catch (error: any) {
+    console.error('❌ Error getting room by ID:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error'
+    });
+  }
+};
+
+// Get all transactions from MongoDB
+export const getAllTransactions = async (req: Request, res: Response): Promise<void> => {
+  try {
+    console.log('📋 Get all transactions request received');
+    
+    const transactions = await AvalancheTransaction.find({})
+      .sort({ createdAt: -1 })
+      .limit(100); // Limit to prevent overwhelming response
+    
+    console.log(`✅ Retrieved ${transactions.length} transactions from database`);
+    
+    res.json({
+      success: true,
+      transactions,
+      count: transactions.length
+    });
+  } catch (error: any) {
+    console.error('❌ Error getting all transactions:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error'
+    });
+  }
+};
+
+// Get transactions by room ID
+export const getTransactionsByRoomId = async (req: Request, res: Response): Promise<void> => {
+  try {
+    console.log('📋 Get transactions by room ID request received:', req.params);
+    
+    const { roomId } = req.params;
+    
+    const transactions = await AvalancheTransaction.find({ roomId })
+      .sort({ createdAt: -1 });
+    
+    console.log(`✅ Retrieved ${transactions.length} transactions for room ${roomId}`);
+    
+    res.json({
+      success: true,
+      transactions,
+      count: transactions.length
+    });
+  } catch (error: any) {
+    console.error('❌ Error getting transactions by room ID:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error'
+    });
+  }
+};
+
+// Get blockchain statistics
+export const getBlockchainStats = async (req: Request, res: Response): Promise<void> => {
+  try {
+    console.log('📊 Get blockchain stats request received');
+    
+    const [totalRooms, totalTransactions, confirmedTransactions, pendingTransactions] = await Promise.all([
+      AvalancheRoom.countDocuments(),
+      AvalancheTransaction.countDocuments(),
+      AvalancheTransaction.countDocuments({ status: 'confirmed' }),
+      AvalancheTransaction.countDocuments({ status: 'pending' })
+    ]);
+    
+    // Get recent activity (last 24 hours)
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recentRooms = await AvalancheRoom.countDocuments({ createdAt: { $gte: oneDayAgo } });
+    const recentTransactions = await AvalancheTransaction.countDocuments({ createdAt: { $gte: oneDayAgo } });
+    
+    console.log('✅ Retrieved blockchain statistics');
+    
+    res.json({
+      success: true,
+      stats: {
+        totalRooms,
+        totalTransactions,
+        confirmedTransactions,
+        pendingTransactions,
+        recentRooms,
+        recentTransactions
+      }
+    });
+  } catch (error: any) {
+    console.error('❌ Error getting blockchain stats:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error'
     });
   }
 };
@@ -114,14 +307,58 @@ export const updateRoom = async (req: Request, res: Response): Promise<void> => 
     const tx = await avalancheContract.updateRoom(id, newLink);
     console.log(`📝 Transaction sent: ${tx.hash}`);
     
-    await tx.wait();
+    // Wait for transaction confirmation
+    const receipt = await tx.wait();
     console.log(`✅ Room ${id} updated successfully`);
+
+    // Save to MongoDB
+    try {
+      // Update existing room data
+      await AvalancheRoom.findOneAndUpdate(
+        { roomId: id },
+        {
+          ipfsLink: newLink,
+          txHash: tx.hash,
+          blockNumber: receipt?.blockNumber,
+          gasUsed: receipt?.gasUsed?.toString(),
+          gasPrice: tx.gasPrice?.toString(),
+          status: 'confirmed',
+          updatedAt: new Date()
+        },
+        { new: true }
+      );
+
+      // Save transaction data
+      const avalancheTx = new AvalancheTransaction({
+        txHash: tx.hash,
+        roomId: id,
+        operation: 'update',
+        status: 'confirmed',
+        blockNumber: receipt?.blockNumber,
+        gasUsed: receipt?.gasUsed?.toString(),
+        gasPrice: tx.gasPrice?.toString(),
+        gasCost: receipt?.gasUsed ? (BigInt(receipt.gasUsed) * BigInt(tx.gasPrice || 0)).toString() : undefined,
+        from: tx.from,
+        to: tx.to,
+        value: tx.value?.toString(),
+        data: tx.data,
+        ipfsLink: newLink
+      });
+      await avalancheTx.save();
+
+      console.log(`💾 Updated room and saved transaction data to MongoDB`);
+    } catch (dbError) {
+      console.error('❌ Error saving to MongoDB:', dbError);
+      // Don't fail the request if MongoDB save fails
+    }
     
     res.json({ 
       success: true, 
       txHash: tx.hash,
       roomId: id,
       newLink,
+      blockNumber: receipt?.blockNumber,
+      gasUsed: receipt?.gasUsed?.toString(),
       message: 'Room updated successfully'
     });
   } catch (error: any) {
