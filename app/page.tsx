@@ -40,7 +40,7 @@ import {
 } from "@/contract/integration/integration";
 import { useAccount } from "wagmi";
 import { ethers } from "ethers";
-import { BACKEND_URL } from "@/lib/constant";
+import { BACKEND_URL, getStoredWalletAddress } from "@/lib/constant";
 
 import { FaHistory } from "react-icons/fa";
 import RoomJoin from "./components/RoomJoin";
@@ -334,6 +334,16 @@ export default function Home() {
   };
 
   const account = useAccount();
+  
+  // Check for stored wallet address on component mount
+  useEffect(() => {
+    const storedAddress = getStoredWalletAddress();
+    if (storedAddress && !account.address) {
+      console.log('📱 Found stored wallet address:', storedAddress);
+      // The wallet address is stored but user might need to reconnect
+      // This will be handled by the Wallet component
+    }
+  }, [account.address]);
 
 
 

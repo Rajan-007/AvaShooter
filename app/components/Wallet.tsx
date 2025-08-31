@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import BtnTemp from '../assets/btn-template.svg';
 import { IoIosWallet } from "react-icons/io";
-import { BACKEND_URL } from '@/lib/constant';
+import { BACKEND_URL, getStoredWalletAddress, setStoredWalletAddress, removeStoredWalletAddress } from '@/lib/constant';
 import toast from 'react-hot-toast';
 
 interface UserData {
@@ -25,20 +25,28 @@ export const CustomWallet = ({
   const [isWalletConnected, setIsWalletConnected] = useState<boolean>(false);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
 
-  // Check local storage on component mount
+  // Check local storage on component mount and set wallet address
   useEffect(() => {
-    const storedAddress = localStorage.getItem('walletAddress');
+    const storedAddress = getStoredWalletAddress();
     if (storedAddress) {
       setWalletAddress(storedAddress);
+      console.log('📱 Retrieved wallet address from localStorage:', storedAddress);
     }
   }, []);
+
+  // Store wallet address in localStorage immediately when available
+  useEffect(() => {
+    if (walletAddress) {
+      setStoredWalletAddress(walletAddress);
+    }
+  }, [walletAddress]);
 
   // Update localStorage when wallet connection changes
   useEffect(() => {
     if (isWalletConnected && walletAddress) {
-      localStorage.setItem('walletAddress', walletAddress);
-    } else if (!isWalletConnected && localStorage.getItem('walletAddress')) {
-      localStorage.removeItem('walletAddress');
+      setStoredWalletAddress(walletAddress);
+    } else if (!isWalletConnected && getStoredWalletAddress()) {
+      removeStoredWalletAddress();
       setFetchedUserData(null)
     }
   }, [isWalletConnected, walletAddress, setFetchedUserData]);
