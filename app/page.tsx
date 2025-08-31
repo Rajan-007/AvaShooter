@@ -36,7 +36,7 @@ import { CustomWallet } from "./components/Wallet";
 import GameIframe from "./components/GameIframe";
 import {
   getStakingTokenBalance,
-  getTokenSymbol,
+  getTokenSymbol, 
 } from "@/contract/integration/integration";
 import { useAccount } from "wagmi";
 import { ethers } from "ethers";
