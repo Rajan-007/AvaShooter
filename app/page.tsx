@@ -21,11 +21,13 @@ import Team from "./assets/play-type/team-up.svg";
 import Playbtn from "./assets/play-btn.svg";
 import Close from "./assets/button-cancel.svg";
 // Adding placeholder item images
-import ItemGun from "../public/images/items/gun.png";
-import ItemGrenade from "../public/images/items/grenade.png";
+import ak47 from "../public/images/items/ak47.jpg";
+import mp40 from "../public/images/items/mp40.png";
+import mp5 from "../public/images/items/mp5.jpg";
+import p90 from "../public/images/items/p90.jpg";
+import ItemGrenade from "../public/images/items/grenade.jpg";
 // import ItemCharacter from '../public/images/character/character_1.png';
-import ItemDiamond from "../public/images/items/diamond.png";
-import ItemGold from "../public/images/items/gold.png";
+import ItemGold from "../public/images/items/Tokens.jpg";
 import LeaderboardPopup from "./components/LeaderboardPopup";
 
 
@@ -38,6 +40,7 @@ import {
 } from "@/contract/integration/integration";
 import { useAccount } from "wagmi";
 import { ethers } from "ethers";
+import { BACKEND_URL } from "@/lib/constant";
 
 import { FaHistory } from "react-icons/fa";
 import RoomJoin from "./components/RoomJoin";
@@ -104,6 +107,12 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [zoneCode, setZoneCode] = useState(null);
   const [duration, setDuration] = useState("1 Min");
+  // const [stakingFromRoomJoin, setStakingFromRoomJoin] = useState(false);
+
+  // Add missing state variables
+  const [purchaseLoading, setPurchaseLoading] = useState(false);
+  const [stakeLoading, setStakeLoading] = useState(false);
+  const [transactionHash, setTransactionHash] = useState<string>("");
 
   // Helper function to format token balance
   const formatTokenBalance = (balance: string) => {
@@ -145,10 +154,10 @@ export default function Home() {
   // Updated shop items with images
   const shopItems = {
     Guns: [
-      { name: "Spirit Rifle", price: 300, image: ItemGun, type: "Gun" },
-      { name: "Ghost Blaster", price: 450, image: ItemGun, type: "Gun" },
-      { name: "Phantom Pistol", price: 250, image: ItemGun, type: "Gun" },
-      { name: "Soul Sniper", price: 500, image: ItemGun, type: "Gun" },
+      { name: "AK47", price: 300, image: ak47, type: "Gun" },
+      { name: "mp40", price: 450, image: mp40, type: "Gun" },
+      { name: "P90", price: 250, image: p90, type: "Gun" },
+      { name: "Mp5", price: 200, image: mp5, type: "Gun" },
     ],
     Grenades: [
       { name: "Flash Orb", price: 200, image: ItemGrenade, type: "Grenade" },
@@ -162,37 +171,37 @@ export default function Home() {
       { name: "Sakura Warrior", price: 550, image: Char1, type: "Character" },
       { name: "Kitsune Rogue", price: 650, image: Char2, type: "Character" },
     ],
-    Diamond: [
-      {
-        name: "Diamond Pack (500)",
-        price: 100,
-        image: ItemDiamond,
-        type: "Diamond",
-      },
-      {
-        name: "Diamond Pack (1000)",
-        price: 180,
-        image: ItemDiamond,
-        type: "Diamond",
-      },
-      {
-        name: "Diamond Pack (2500)",
-        price: 400,
-        image: ItemDiamond,
-        type: "Diamond",
-      },
-      {
-        name: "Diamond Pack (5000)",
-        price: 700,
-        image: ItemDiamond,
-        type: "Diamond",
-      },
-    ],
+    // Diamond: [
+    //   {
+    //     name: "Diamond Pack (500)",
+    //     price: 100,
+    //     image: ItemDiamond,
+    //     type: "Diamond",
+    //   },
+    //   {
+    //     name: "Diamond Pack (1000)",
+    //     price: 180,
+    //     image: ItemDiamond,
+    //     type: "Diamond",
+    //   },
+    //   {
+    //     name: "Diamond Pack (2500)",
+    //     price: 400,
+    //     image: ItemDiamond,
+    //     type: "Diamond",
+    //   },
+    //   {
+    //     name: "Diamond Pack (5000)",
+    //     price: 700,
+    //     image: ItemDiamond,
+    //     type: "Diamond",
+    //   },
+    // ],
     Gold: [
-      { name: "Gold Pack (1000)", price: 80, image: ItemGold, type: "Gold" },
-      { name: "Gold Pack (2500)", price: 150, image: ItemGold, type: "Gold" },
-      { name: "Gold Pack (5000)", price: 280, image: ItemGold, type: "Gold" },
-      { name: "Gold Pack (10000)", price: 500, image: ItemGold, type: "Gold" },
+      { name: "AST Tokens (1000)", price: 100, image: ItemGold, type: "Gold" },
+      { name: "AST Tokens (2500)", price: 150, image: ItemGold, type: "Gold" },
+      { name: "AST Tokens (5000)", price: 280, image: ItemGold, type: "Gold" },
+      { name: "AST Tokens (10000)", price: 500, image: ItemGold, type: "Gold" },
     ],
   };
 
@@ -234,7 +243,88 @@ export default function Home() {
     setShowGameFrame(false);
   };
 
+  const handlePurchase = async (item: { type: string; name: string; price: number; image: any }) => {
+    try {
+      setPurchaseLoading(true);
+      
+      // Debug logging
+      console.log('🛒 Starting purchase for:', item);
+      console.log('🔗 Backend URL:', BACKEND_URL);
+      console.log('👤 Account:', account);
+      
+      const purchaseData = {
+        type: item.type,
+        name: item.name,
+        price: item.price,
+        image: item.image.src || item.image,
+        userId: account?.address || 'anonymous'
+      };
+      
+      console.log('📦 Purchase data being sent:', purchaseData);
+      
+      const response = await fetch(`${BACKEND_URL}/api/purchases`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(purchaseData),
+      });
 
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response headers:', response.headers);
+
+      if (response.ok) {
+        const responseData = await response.json();
+        console.log('✅ Purchase successful:', responseData);
+        alert(`Successfully purchased ${item.name}!`);
+      } else {
+        const errorData = await response.json();
+        console.error('❌ Purchase failed:', errorData);
+        alert(`Purchase failed: ${errorData.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('💥 Purchase error:', error);
+      alert('Purchase failed. Please try again.');
+    } finally {
+      setPurchaseLoading(false);
+    }
+  };
+
+  const handleStaking = async (stakeAmount: number) => {
+    setStakeLoading(true);
+    const walletAddress = account?.address;
+    try {
+      // Note: stakeTokens function is not imported, so we'll comment this out for now
+      // const result = await stakeTokens({ amount: stakeAmount });
+      // console.log("Staking successful:", result);
+      // const hash = result?.hash;
+      // if (hash) {
+      //   setTransactionHash(hash);
+      //   console.log("Transaction Hash:", hash);
+      // }
+      
+      const historyRes = await fetch(`${BACKEND_URL}/api/stake/history/add`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          walletAddress,
+          amount: stakeAmount,
+        }),
+      });
+
+      if (historyRes.ok) {
+        console.log("Staking history added successfully");
+      } else {
+        console.error("Failed to add staking history");
+      }
+    } catch (error) {
+      console.error("Staking error:", error);
+    } finally {
+      setStakeLoading(false);
+    }
+  };
 
   const account = useAccount();
 
@@ -904,24 +994,33 @@ export default function Home() {
                               UNLOCK NOW
                             </p>
                           </div>
-                          <div className="relative w-24 h-12 flex-shrink-0">
-                            <Image
-                              src={Playbtn}
-                              alt="play-btn"
-                              layout="fill"
-                              className="object-contain"
-                            />
-                            <div className="absolute inset-0 flex space-x-1 items-center justify-center">
+                          <div className="flex flex-col items-end gap-2">
+                            <div className="relative w-24 h-12 flex-shrink-0">
                               <Image
-                                src={Coin}
-                                alt="Coin"
-                                width={16}
-                                height={16}
+                                src={Playbtn}
+                                alt="play-btn"
+                                layout="fill"
+                                className="object-contain"
                               />
-                              <span className="font-bold text-lg text-black">
-                                {item.price}
-                              </span>
+                              <div className="absolute inset-0 flex space-x-1 items-center justify-center">
+                                <Image
+                                  src={Coin}
+                                  alt="Coin"
+                                  width={16}
+                                  height={16}
+                                />
+                                <span className="font-bold text-lg text-black">
+                                  {item.price}
+                                </span>
+                              </div>
                             </div>
+                            <button
+                              onClick={() => handlePurchase(item)}
+                              disabled={purchaseLoading}
+                              className="bg-green-600 hover:bg-green-700 disabled:bg-gray-500 text-white font-bold py-2 px-4 rounded text-sm transition-colors"
+                            >
+                              {purchaseLoading ? 'Buying...' : 'BUY'}
+                            </button>
                           </div>
                         </div>
                       </div>

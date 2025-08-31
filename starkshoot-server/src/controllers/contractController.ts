@@ -2,50 +2,78 @@ import { Request, Response } from 'express';
 import { ethers } from 'ethers';
 import dotenv from 'dotenv';
 import ContractABI from '../abi/GameContract.json';
+import { env } from '../config/env';
 
 dotenv.config();
 
-const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
-const wallet = new ethers.Wallet(process.env.PRIVATE_KEY!, provider);
-const contractAddress = process.env.CONTRACT_ADDRESS!;
-const contract = new ethers.Contract(contractAddress, ContractABI, wallet);
+// Lazy initialization to prevent ENS errors on startup
+let provider: ethers.JsonRpcProvider | null = null;
+let wallet: ethers.Wallet | null = null;
+let contract: ethers.Contract | null = null;
+
+function initializeContract() {
+  if (!env.hasContractConfig) {
+    throw new Error('Contract features are not configured. Please set RPC_URL, PRIVATE_KEY, and CONTRACT_ADDRESS environment variables.');
+  }
+  
+  if (!provider || !wallet || !contract) {
+    try {
+      const rpcUrl = env.rpcUrl!;
+      const privateKey = env.privateKey!;
+      const contractAddress = env.contractAddress!;
+      
+      provider = new ethers.JsonRpcProvider(rpcUrl);
+      wallet = new ethers.Wallet(privateKey, provider);
+      contract = new ethers.Contract(contractAddress, ContractABI, wallet);
+      
+      console.log('✅ Contract initialized successfully');
+    } catch (error) {
+      console.error('❌ Failed to initialize contract:', error);
+      throw error;
+    }
+  }
+  return { provider, wallet, contract };
+}
 
 // POST /api/contract/assign
 export const assignToMatch = async (req: Request, res: Response): Promise<void> => {
-  const { matchId, players } = req.body;
-
-  if (!matchId || !players || !Array.isArray(players)) {
-    res.status(400).json({ error: 'matchId and players[] required' });
-    return;
-  }
-
   try {
+    const { matchId, players } = req.body;
+
+    if (!matchId || !players || !Array.isArray(players)) {
+      res.status(400).json({ error: 'matchId and players[] required' });
+      return;
+    }
+
+    const { contract } = initializeContract();
     const tx = await contract.assignToMatch(matchId, players);
     await tx.wait();
     res.json({ success: true, txHash: tx.hash });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('Error in assignToMatch:', error);
+    res.status(500).json({ error: error.message || 'Internal server error' });
   }
 };
 
 // POST /api/contract/set-winner
 export const setWinner = async (req: Request, res: Response): Promise<void> => {
-  const { matchId, winner } = req.body;
-
-  if (!matchId || !winner) {
-    res.status(400).json({ error: 'matchId and winner required' });
-    return;
-  }
-
   try {
+    const { matchId, winner } = req.body;
+
+    if (!matchId || !winner) {
+      res.status(400).json({ error: 'matchId and winner required' });
+      return;
+    }
+
+    const { contract } = initializeContract();
     const tx = await contract.setWinner(matchId, winner);
     await tx.wait();
     res.json({ success: true, txHash: tx.hash });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('Error in setWinner:', error);
+    res.status(500).json({ error: error.message || 'Internal server error' });
   }
 };
-
 
 export const createMatch = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -84,6 +112,8 @@ export const createMatch = async (req: Request, res: Response): Promise<void> =>
 async function createMatchOnContract(roomId: string, entryFee: string, maxPlayers: number) {
   try {
     console.log("Creating match on contract...");
+    
+    const { contract } = initializeContract();
     
     // Convert roomId string to bytes32 format
     const roomIdBytes32 = ethers.zeroPadValue(ethers.toUtf8Bytes(roomId), 32);
