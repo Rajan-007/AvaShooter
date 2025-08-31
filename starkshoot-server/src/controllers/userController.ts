@@ -14,9 +14,9 @@ export const updateStakedStatus = async (req: Request, res: Response) => {
       { isStaked },
       { new: true, upsert: true }
     );
-    res.json(user);
+    return res.json(user);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to update stake status' });
+    return res.status(500).json({ error: 'Failed to update stake status' });
   }
 };
 
@@ -32,13 +32,13 @@ export const updateUserScore = async (req: Request, res: Response) => {
       );
   
       if (!user) {
-        res.status(404).json({ error: 'User not found' });
+        return res.status(404).json({ error: 'User not found' });
       }
   
       // Return the updated user
-      res.json(user);
+      return res.json(user);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to update score and kills' });
+      return res.status(500).json({ error: 'Failed to update score and kills' });
     }
 };  
 
@@ -46,7 +46,7 @@ export const setupUser = async (req: Request, res: Response) => {
     const { walletAddress, username } = req.body;
   
     if (!walletAddress || !username) {
-        res.status(400).json({ error: 'walletAddress and username are required' });
+        return res.status(400).json({ error: 'walletAddress and username are required' });
     }
   
     try {
@@ -55,23 +55,125 @@ export const setupUser = async (req: Request, res: Response) => {
       const existingWalletUser = await User.findOne({ walletAddress });
   
       if (existingUsername && (!existingWalletUser || existingUsername.walletAddress !== walletAddress)) {
-        res.status(400).json({ error: 'Username already taken' });
+        return res.status(400).json({ error: 'Username already taken' });
       }
   
-      // Upsert user
+      // If user exists with this wallet, just update the username
+      if (existingWalletUser) {
+        const updatedUser = await User.findOneAndUpdate(
+          { walletAddress },
+          { $set: { username } },
+          { new: true }
+        );
+        return res.json(updatedUser);
+      }
+  
+      // Create new user
       const user = await User.findOneAndUpdate(
         { walletAddress },
         {
           $set: { username },
-          $setOnInsert: { isStaked: false, kills: 0, score: 0, currentRoom: '' },
+          $setOnInsert: { 
+            isStaked: false, 
+            currentRoomId: '',
+            currentRoomDuration: 0,
+            ParticipatedRooms: []
+          },
         },
         { new: true, upsert: true }
       );
   
-      res.json(user);
+      return res.json(user);
     } catch (err) {
       console.error(err);
-      res.status(500).json({ error: 'Failed to setup user' });
+      return res.status(500).json({ error: 'Failed to setup user' });
+    }
+  };
+
+// New function to handle wallet connection and user check/creation
+export const handleWalletConnection = async (req: Request, res: Response) => {
+    const { walletAddress } = req.body;
+  
+    if (!walletAddress) {
+        return res.status(400).json({ error: 'walletAddress is required' });
+    }
+  
+    try {
+      // Check if user already exists
+      const existingUser = await User.findOne({ walletAddress });
+  
+      if (existingUser) {
+        // User exists, return user data
+        return res.json({
+          user: existingUser,
+          isNewUser: false,
+          needsUsername: false
+        });
+      } else {
+        // User doesn't exist, indicate they need to provide username
+        return res.json({
+          user: null,
+          isNewUser: true,
+          needsUsername: true
+        });
+      }
+    } catch (err) {
+      console.error('Error in handleWalletConnection:', err);
+      res.status(500).json({ error: 'Failed to check user status' });
+    }
+  };
+
+// Enhanced function to create or update user with username
+export const createOrUpdateUser = async (req: Request, res: Response) => {
+    const { walletAddress, username } = req.body;
+  
+    if (!walletAddress || !username) {
+        return res.status(400).json({ error: 'walletAddress and username are required' });
+    }
+  
+    try {
+      // Check if the username is already used by another user
+      const existingUsername = await User.findOne({ username });
+      const existingWalletUser = await User.findOne({ walletAddress });
+  
+      if (existingUsername && (!existingWalletUser || existingUsername.walletAddress !== walletAddress)) {
+        return res.status(400).json({ error: 'Username already taken' });
+      }
+  
+      let user;
+  
+      if (existingWalletUser) {
+        // Update existing user's username
+        user = await User.findOneAndUpdate(
+          { walletAddress },
+          { $set: { username } },
+          { new: true }
+        );
+      } else {
+        // Create new user
+        user = await User.findOneAndUpdate(
+          { walletAddress },
+          {
+            $set: { username },
+            $setOnInsert: { 
+              isStaked: false, 
+              currentRoomId: '',
+              currentRoomDuration: 0,
+              ParticipatedRooms: []
+            },
+          },
+          { new: true, upsert: true }
+        );
+      }
+  
+      res.json({
+        success: true,
+        user,
+        isNewUser: !existingWalletUser
+      });
+    } catch (err) {
+      console.error('Error in createOrUpdateUser:', err);
+      res.status(500).json({ error: 'Failed to create or update user' });
     }
   };
 
@@ -80,7 +182,7 @@ export const updateCurrentRoom = async (req: Request, res: Response) => {
     const { walletAddress, currentRoom } = req.body;
   
     if (!walletAddress || !currentRoom) {
-        res.status(400).json({ error: 'walletAddress and currentRoom are required' });
+        return res.status(400).json({ error: 'walletAddress and currentRoom are required' });
     }
   
     try {
@@ -91,13 +193,13 @@ export const updateCurrentRoom = async (req: Request, res: Response) => {
       );
   
       if (!user) {
-        res.status(404).json({ error: 'User not found' });
+        return res.status(404).json({ error: 'User not found' });
       }
   
-      res.json({ message: 'Current room updated successfully', user });
+      return res.json({ message: 'Current room updated successfully', user });
     } catch (err) {
       console.error(err);
-      res.status(500).json({ error: 'Failed to update current room' });
+      return res.status(500).json({ error: 'Failed to update current room' });
     }
   };  
 
@@ -106,10 +208,10 @@ export const getUser = async (req: Request, res: Response) => {
     const { walletAddress } = req.params;
     try {
       const user = await User.findOne({ walletAddress });
-      if (!user) res.status(404).json({ error: 'User not found' });
-      res.json(user);
+      if (!user) return res.status(404).json({ error: 'User not found' });
+      return res.json(user);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to retrieve user' });
+      return res.status(500).json({ error: 'Failed to retrieve user' });
     }
 };  
 
@@ -133,10 +235,10 @@ export const getRoom = async (req: Request, res: Response) => {
     const { roomId } = req.params;
     try {
       const room = await Room.findOne({ roomId });
-      if (!room) res.status(404).json({ error: 'Room not found' });
-      res.json(room);
+      if (!room) return res.status(404).json({ error: 'Room not found' });
+      return res.json(room);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to retrieve room' });
+      return res.status(500).json({ error: 'Failed to retrieve room' });
     }
 };
 
@@ -146,9 +248,9 @@ export const addStakingData = async (req: Request, res: Response) => {
     try {
       const record = new StakingHistory({ walletAddress, amount });
       await record.save();
-      res.json(record);
+      return res.json(record);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to save staking data' });
+      return res.status(500).json({ error: 'Failed to save staking data' });
     }
 };
 
@@ -157,9 +259,9 @@ export const getStakingData = async (req: Request, res: Response) => {
     const { walletAddress } = req.params;
     try {
       const history = await StakingHistory.find({ walletAddress }).sort({ timestamp: -1 });
-      res.json(history);
+      return res.json(history);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to retrieve staking data' });
+      return res.status(500).json({ error: 'Failed to retrieve staking data' });
     }
 };
 
@@ -200,9 +302,9 @@ export const getRoomsPlayedWithUsernames = async (req: Request, res: Response) =
         }))
       }));
   
-      res.json(enrichedRooms);
+      return res.json(enrichedRooms);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to fetch rooms and usernames' });
+      return res.status(500).json({ error: 'Failed to fetch rooms and usernames' });
     }
 };
 
@@ -216,10 +318,10 @@ export const getUserStakeStatus = async (req: Request, res: Response) => {
       if (!user) {
         res.status(404).json({ error: 'User not found' });
       } else {
-        res.json({ isStaked: user.isStaked });
+        return res.json({ isStaked: user.isStaked });
       }
     } catch (err) {
-      res.status(500).json({ error: 'Failed to retrieve stake status' });
+      return res.status(500).json({ error: 'Failed to retrieve stake status' });
     }
 };
 
@@ -230,9 +332,9 @@ export const addLeaderboardEntry = async (req: Request, res: Response) => {
     try {
       const entry = new Leaderboard({ walletAddress, kills, score, roomId, username, gameTime });
       await entry.save();
-      res.json(entry);
+      return res.json(entry);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to add leaderboard entry' });
+      return res.status(500).json({ error: 'Failed to add leaderboard entry' });
     }
   };
   
@@ -242,9 +344,9 @@ export const addLeaderboardEntry = async (req: Request, res: Response) => {
   
     try {
       const entries = await Leaderboard.find({ walletAddress });
-      res.json(entries);
+      return res.json(entries);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to retrieve leaderboard data by wallet address' });
+      return res.status(500).json({ error: 'Failed to retrieve leaderboard data by wallet address' });
     }
   };
   
@@ -254,9 +356,9 @@ export const addLeaderboardEntry = async (req: Request, res: Response) => {
   
     try {
       const entries = await Leaderboard.find({ roomId });
-      res.json(entries);
+      return res.json(entries);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to retrieve leaderboard data by room ID' });
+      return res.status(500).json({ error: 'Failed to retrieve leaderboard data by room ID' });
     }
 };
 
@@ -299,10 +401,10 @@ export const fetchAvailableRooms = async (req: Request, res: Response) => {
     }).filter(room => room.meetsMinimumRequirement)
       .map(({ meetsMinimumRequirement, ...rest }) => rest); // Remove the temporary field
 
-    res.json(availableRooms);
+    return res.json(availableRooms);
     console.log('Available rooms:', availableRooms);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch available rooms' });
+    return res.status(500).json({ error: 'Failed to fetch available rooms' });
   }
 };
 
@@ -396,7 +498,7 @@ export const joinRoom = async (req: Request, res: Response) => {
       }
     );
 
-    res.json({
+    return res.json({
       success: true,
       message: 'User successfully joined the room',
       room,
@@ -404,7 +506,7 @@ export const joinRoom = async (req: Request, res: Response) => {
     });
   } catch (err) {
     console.error('Error in joinRoom:', err);
-    res.status(500).json({ error: 'Failed to join room' });
+    return res.status(500).json({ error: 'Failed to join room' });
   }
 };
 
@@ -436,7 +538,7 @@ export const getRoomDetails = async (req: Request, res: Response) => {
       remainingTime = Math.max(0, room.Duration - elapsed);
     }
 
-    res.json({
+    return res.json({
       roomId: room.roomId,
       members: userDetails,
       duration: room.Duration,
@@ -448,7 +550,7 @@ export const getRoomDetails = async (req: Request, res: Response) => {
       winner: room.winner
     });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to get room details' });
+    return res.status(500).json({ error: 'Failed to get room details' });
   }
 };
 
@@ -474,7 +576,7 @@ export const startGame = async (req: Request, res: Response) => {
       await room.save();
     }
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Game started successfully',
       room: {
@@ -486,7 +588,7 @@ export const startGame = async (req: Request, res: Response) => {
     });
   } catch (err) {
     console.error('Error in startGame:', err);
-    res.status(500).json({ error: 'Failed to start game' });
+    return res.status(500).json({ error: 'Failed to start game' });
   }
 };
 
@@ -553,14 +655,82 @@ export const makeWinner = async (req: Request, res: Response) => {
 
     await Promise.all(userUpdates);
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Winner declared and room moved to completed successfully',
       completedRoom
     });
   } catch (err) {
     console.error('Error in makeWinner:', err);
-    res.status(500).json({ error: 'Failed to declare winner and archive room' });
+    return res.status(500).json({ error: 'Failed to declare winner and archive room' });
+  }
+};
+
+// New function to handle game start and update user staking status
+export const handleGameStart = async (req: Request, res: Response) => {
+  const { roomId, walletAddress } = req.body;
+
+  if (!roomId || !walletAddress) {
+    return res.status(400).json({ error: 'roomId and walletAddress are required' });
+  }
+
+  try {
+    // Find the room
+    const room = await Room.findOne({ roomId });
+    if (!room) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+
+    // Check if user is in the room
+    if (!room.users.includes(walletAddress)) {
+      return res.status(400).json({ error: 'User not in this room' });
+    }
+
+    // Calculate remaining duration
+    let currentRoomDuration = room.Duration;
+    if (room.gameStarted && room.startedAt) {
+      const now = new Date();
+      const elapsedSeconds = Math.floor((now.getTime() - room.startedAt.getTime()) / 1000);
+      currentRoomDuration = Math.max(room.Duration - elapsedSeconds, 0);
+    }
+
+    // Update user: set isStaked to true and update room information
+    const updatedUser = await User.findOneAndUpdate(
+      { walletAddress },
+      {
+        $set: {
+          isStaked: true,
+          currentRoomId: roomId,
+          currentRoomDuration: currentRoomDuration
+        }
+      },
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Game started successfully. User staking status updated.',
+      user: {
+        walletAddress: updatedUser.walletAddress,
+        username: updatedUser.username,
+        isStaked: updatedUser.isStaked,
+        currentRoomId: updatedUser.currentRoomId,
+        currentRoomDuration: updatedUser.currentRoomDuration
+      },
+      room: {
+        roomId: room.roomId,
+        duration: room.Duration,
+        remainingTime: currentRoomDuration,
+        gameStarted: room.gameStarted
+      }
+    });
+  } catch (err) {
+    console.error('Error in handleGameStart:', err);
+    return res.status(500).json({ error: 'Failed to start game and update user status' });
   }
 };
 

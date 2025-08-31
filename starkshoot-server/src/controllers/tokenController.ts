@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { ethers } from 'ethers';  // Import ethers
 import dotenv from 'dotenv';
+import { Room } from '../models/Room'; // Import Room model
 
 // Load environment variables
 dotenv.config();
@@ -387,7 +388,6 @@ export async function findWalletContracts(req: Request, res: Response, next: Nex
 }
 
  // Function to handle token transfer
-// Function to handle token transfer
 export async function transferTokens(req: Request, res: Response, next: NextFunction): Promise<void> {
 	const { walletAddress, playerCount, roomId } = req.body;
   
@@ -397,13 +397,33 @@ export async function transferTokens(req: Request, res: Response, next: NextFunc
 	  return;
 	}
   
-	// Convert token amount to the smallest unit (50 tokens with 18 decimals)
-	const tokenAmount = ethers.parseUnits('50', 18);  // 50 tokens with 18 decimals
-	console.log(tokenAmount);
-  
 	try {
 	  console.log(`🔄 Starting token transfer to: ${walletAddress}`);
 	  console.log(`🎮 Player count: ${playerCount}, Room ID: ${roomId}`);
+  
+	  // Get room details from database
+	  const room = await Room.findOne({ roomId: roomId });
+	  if (!room) {
+		console.error(`❌ Room not found: ${roomId}`);
+		res.status(404).send({ error: 'Room not found', roomId });
+		return;
+	  }
+  
+	  // Get staking amount from room
+	  const stakingAmount = room.stakingAmount || 0;
+	  console.log(`💰 Room staking amount: ${stakingAmount} ${room.stakingToken || 'AST'}`);
+  
+	  // Calculate total pool (staking amount * player count)
+	  const totalPool = stakingAmount * playerCount;
+	  console.log(`🎯 Total pool: ${totalPool} (${stakingAmount} * ${playerCount})`);
+  
+	  // Calculate 80% of total pool
+	  const transferAmount = totalPool * 0.8;
+	  console.log(`🎯 Transfer amount (80%): ${transferAmount}`);
+  
+	  // Convert to token units (with 18 decimals)
+	  const tokenAmount = ethers.parseUnits(transferAmount.toString(), 18);
+	  console.log(`🎯 Token amount in wei: ${tokenAmount.toString()}`);
   
 	  // Validate contract first
 	  const isContractValid = await validateContract();
@@ -415,31 +435,6 @@ export async function transferTokens(req: Request, res: Response, next: NextFunc
 	  // Check if the server wallet has enough AVAX for gas fees
 	  const balance = await provider.getBalance(wallet.address);
 	  console.log(`💰 Server wallet balance (AVAX): ${ethers.formatEther(balance)} AVAX`);
-  
-	  // Estimate gas for the transaction
-	//   const gasCost = await provider.estimateGas({
-	// 	to: finalCONTRACT_ADDRESS,
-	// 	data: contract.interface.encodeFunctionData('transfer', [walletAddress, 1]),
-	//   });
-	//   console.log(`⛽ Estimated gas cost: ${gasCost.toString()}`);
-  
-	// const feeData = await provider.getFeeData();
-    // const gasPrice = feeData.gasPrice || ethers.parseUnits('10', 'gwei');
-    // const estimatedGasFee = gasPrice * gasCost;
-
-    // console.log(`⛽ Estimated gas fee: ${ethers.formatEther(estimatedGasFee)} AVAX`);
-
-    // Check if server wallet has enough AVAX for gas fees
-    // if (balance < estimatedGasFee) {
-	// 	console.error('💸 Server wallet has insufficient AVAX for gas fees');
-	// 	res.status(400).send({ 
-	// 	  error: 'Server wallet has insufficient AVAX for gas fees',
-	// 	  required: ethers.formatEther(estimatedGasFee),
-	// 	  available: ethers.formatEther(balance),
-	// 	  serverWallet: wallet.address
-	// 	});
-	// 	return;
-	//   }
   
 	  // Check if the server wallet has enough tokens to transfer
 	  const serverTokenBalance = await contract.balanceOf(wallet.address);
@@ -460,7 +455,7 @@ export async function transferTokens(req: Request, res: Response, next: NextFunc
   
 	  // Initiate the token transfer transaction
 	  console.log(`📤 Sending transaction...`);
-	  const tx = await contract.transfer(walletAddress, ethers.parseUnits("10", 18));
+	  const tx = await contract.transfer(walletAddress, tokenAmount);
 	  console.log(`⏳ Transaction sent: ${tx.hash}`);
   
 	  // Wait for the transaction to be mined
@@ -473,7 +468,11 @@ export async function transferTokens(req: Request, res: Response, next: NextFunc
 		transactionHash: receipt.transactionHash,
 		blockNumber: receipt.blockNumber,
 		playerCount,
-		roomId
+		roomId,
+		roomStakingAmount: stakingAmount,
+		totalPool: totalPool,
+		transferAmount: transferAmount,
+		transferPercentage: '80%'
 	  });
   
 	} catch (error: any) {

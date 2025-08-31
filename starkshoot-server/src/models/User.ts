@@ -1,5 +1,4 @@
 import mongoose from 'mongoose';
-import { kill } from 'process';
 
 const userSchema = new mongoose.Schema({
   walletAddress: { type: String, unique: true, required: true },
@@ -15,7 +14,7 @@ const userSchema = new mongoose.Schema({
     // score: { type: Number, default: 0 },
     // createdAt: { type: Date, default: Date.now },
     // kills: { type: Number, default: 0 },
-    gameTime: { type: Number, default: '' }
+    gameTime: { type: Number, default: 0 }
 
   }],
   createdAt: { type: Date, default: Date.now },

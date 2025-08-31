@@ -26,9 +26,9 @@ interface StartPopupProps {
 }
 
 /** ------- Network / addresses ------- */
-const FUJI_CHAIN_ID = parseInt(process.env.NEXT_PUBLIC_FUJI_CHAIN_ID || '43113'); // Avalanche Fuji Testnet
-const TOKEN_ADDRESS = (process.env.NEXT_PUBLIC_TOKEN_CONTRACT_ADDRESS || '0x1Bc07dB7Aea904379680Ff53FfC88E8dBa5C2619') as const;
-const POLL_ACCOUNT = (process.env.NEXT_PUBLIC_POLL_ACCOUNT_ADDRESS || '0xf06D8c7558AF7BEb88A28714ab157fa782869368') as const;
+const FUJI_CHAIN_ID = parseInt(process.env.NEXT_PUBLIC_FUJI_CHAIN_ID as string); // Avalanche Fuji Testnet
+const TOKEN_ADDRESS = process.env.NEXT_PUBLIC_TOKEN_CONTRACT_ADDRESS;
+const POLL_ACCOUNT = process.env.NEXT_PUBLIC_POLL_ACCOUNT_ADDRESS;
 
 /** ------- Minimal ERC-20 ABI ------- */
 const ERC20_ABI = [

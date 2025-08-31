@@ -642,7 +642,26 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
       });
 
       if (startResponse.ok) {
-        toast.success("Game started! Room timer is now running.");
+        // Update user staking status and room information
+        const userUpdateResponse = await fetch(`${BACKEND_URL}/api/user/game-start`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            roomId: selectedRoomId,
+            walletAddress: walletAddress,
+          }),
+        });
+
+        if (userUpdateResponse.ok) {
+          const userData = await userUpdateResponse.json();
+          console.log("User staking status updated:", userData);
+          toast.success("Game started! User staking status updated.");
+        } else {
+          console.error("Failed to update user staking status");
+        }
+
         // Refresh the rooms to update the timer status
         fetchRooms(false);
         
