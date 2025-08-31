@@ -33,7 +33,7 @@ import LeaderboardPopup from "./components/LeaderboardPopup";
 
 import Image from "next/image";
 import { CustomWallet } from "./components/Wallet";
-import SimpleGameFrame from "./components/iframe";
+import GameIframe from "./components/GameIframe";
 import {
   getStakingTokenBalance,
   getTokenSymbol,
@@ -89,6 +89,7 @@ export default function Home() {
     "solo"
   );
   const [showGameFrame, setShowGameFrame] = useState(false);
+  const [currentRoomId, setCurrentRoomId] = useState("");
 
   // const [playerName, setPlayerName] = useState('');
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -241,6 +242,12 @@ export default function Home() {
 
   const handleCloseGameFrame = () => {
     setShowGameFrame(false);
+    setCurrentRoomId("");
+  };
+
+  const handleStartGame = (roomId: string) => {
+    setCurrentRoomId(roomId);
+    setShowGameFrame(true);
   };
 
   const handlePurchase = async (item: { type: string; name: string; price: number; image: any }) => {
@@ -900,6 +907,7 @@ export default function Home() {
           duration={duration}
           setDuration={setDuration}
           mode={selectedMode}
+          onGameReady={handleStartGame}
         />
       )}
 
@@ -911,7 +919,12 @@ export default function Home() {
         />
       )}
 
-      {showGameFrame && <SimpleGameFrame onClose={handleCloseGameFrame} />}
+      {showGameFrame && (
+        <GameIframe 
+          roomId={currentRoomId}
+          onClose={handleCloseGameFrame} 
+        />
+      )}
 
       {/* Shop Popup - Updated with Item Images in Grid */}
       {showShopPopup && (

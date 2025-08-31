@@ -34,6 +34,7 @@ interface RoomPopupProps {
   onShowStakePopup: (roomStakeAmount?: number) => void; // Updated to accept room stake amount
   stakingAmount?: number; // Staking amount for the room
   setStakingAmount?: (amount: number) => void; // Prop to update staking amount
+  onGameReady?: (roomId: string) => void; // Callback when game is ready to start
 }
 
 const RoomPopup: React.FC<RoomPopupProps> = ({
@@ -48,9 +49,9 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
   onShowStakePopup, // Destructure new prop
   stakingAmount = 10, // Default staking amount
   setStakingAmount, // Prop to update staking amount
+  onGameReady, // Callback when game is ready
 }) => {
   const [showStakePopup, setShowStakePopup] = useState(false);
-  const [showGameIframe, setShowGameIframe] = useState(false);
   const [selectedRoomStakeAmount, setSelectedRoomStakeAmount] = useState<number>(10);
   const [selectedRoomId, setSelectedRoomId] = useState<string>('');
   const [zoneOptions, setZoneOptions] = useState<ZoneOption[]>([]);
@@ -608,7 +609,6 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
 
   const handleGameStart = async () => {
     setShowStakePopup(false);
-    setShowGameIframe(true);
     
     try {
       // First join the room if not already joined
@@ -643,8 +643,13 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
 
       if (startResponse.ok) {
         toast.success("Game started! Room timer is now running.");
-              // Refresh the rooms to update the timer status
-      fetchRooms(false);
+        // Refresh the rooms to update the timer status
+        fetchRooms(false);
+        
+        // Notify parent component that game is ready
+        if (onGameReady) {
+          onGameReady(selectedRoomId);
+        }
       } else {
         const error = await startResponse.json();
         toast.error(error.message || "Failed to start game timer");
@@ -655,20 +660,9 @@ const RoomPopup: React.FC<RoomPopupProps> = ({
     }
   };
 
-  const handleCloseGame = () => {
-    setShowGameIframe(false);
-    handleCloseStartPopup();
-  };
+  // Remove handleCloseGame since game iframe is now handled by parent
 
-  // Show game iframe if active
-  if (showGameIframe) {
-    return (
-      <GameIframe 
-        roomId={selectedRoomId} 
-        onClose={handleCloseGame} 
-      />
-    );
-  }
+  // Remove the game iframe handling from this component since it will be handled by parent
 
   // Show stake popup if active
   if (showStakePopup) {
